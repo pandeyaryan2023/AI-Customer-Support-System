@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Secrets and local config (never commit these)
+.env
+
+# Prototype data file (created when you run the app)
+python-prototype/complaints.json
+
+# Editor
+.vscode/
