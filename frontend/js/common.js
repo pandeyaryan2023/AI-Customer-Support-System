@@ -7,8 +7,11 @@
    button's loading state.
    ============================================================ */
 
-// When the page is served by FastAPI (port 8000) the API is on the same origin.
-const API_BASE = location.port === "8000" ? "" : "http://127.0.0.1:8000";
+// FastAPI serves this interface at /app/, so whenever the page came from there the API
+// is on the same origin — whatever port the backend runs on (8000, 8001, ...). Relative
+// URLs then need no CORS at all. The absolute address below is only a fallback for
+// opening these files outside the backend (a separate static server, or file://).
+const API_BASE = location.pathname.startsWith("/app/") ? "" : "http://127.0.0.1:8001";
 
 const DASHBOARD = { CUSTOMER: "customer.html", AGENT: "agent.html", ADMIN: "admin.html" };
 const STATUSES = ["OPEN", "IN_PROGRESS", "WAITING_FOR_CUSTOMER", "ESCALATED", "RESOLVED", "CLOSED"];
