@@ -1,8 +1,12 @@
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
-from app.api import admin, auth, categories, tickets
+from app.api import admin, agents, auth, categories, tickets
 from app.api.deps import DbSession
 from app.core.config import settings
 
@@ -22,7 +26,18 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(tickets.router)
 app.include_router(categories.router)
+app.include_router(agents.router)
 app.include_router(admin.router)
+
+# The web interface (plain HTML/CSS/JS) is served from the same server at /app/,
+# so the browser and the API share one origin.
+FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"  # <project root>/frontend
+if FRONTEND_DIR.is_dir():
+    app.mount("/app", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+
+    @app.get("/", include_in_schema=False)
+    def root():
+        return RedirectResponse("/app/")
 
 
 @app.get("/health", tags=["Health"])

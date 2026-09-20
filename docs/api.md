@@ -35,6 +35,7 @@ Authenticated endpoints need the header `Authorization: Bearer <token>`.
 | Method | Path | Who | Purpose |
 |---|---|---|---|
 | GET | `/categories` | any logged-in user | Active categories |
+| GET | `/agents` | agent, admin | Active agents (names only), for assignment drop-downs |
 | GET | `/admin/users` | admin | All users (`?role=`) |
 | PATCH | `/admin/users/{id}` | admin | Enable / disable an account |
 | GET, POST | `/admin/agents` | admin | List / create agents |

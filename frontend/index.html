@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Support Desk</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+</head>
+<body>
+  <p>Loading…</p>
+  <script src="js/common.js"></script>
+  <script>
+    // Send the visitor to their dashboard if logged in, otherwise to the login page.
+    const session = getSession();
+    location.replace(session ? DASHBOARD[session.role] : "login.html");
+  </script>
+</body>
+</html>

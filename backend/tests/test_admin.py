@@ -74,6 +74,21 @@ def test_stats(client, make_user, new_ticket):
     assert stats["users_by_role"] == {"CUSTOMER": 1, "AGENT": 0, "ADMIN": 1}
 
 
+def test_staff_can_list_active_agents_without_emails(client, make_user):
+    admin = make_user(Role.ADMIN, "admin@example.com")
+    agent = make_user(Role.AGENT, "a1@example.com", name="Active Agent")
+    gone = make_user(Role.AGENT, "a2@example.com", name="Gone Agent")
+    customer = make_user(Role.CUSTOMER, "c@example.com")
+    client.patch(f"/admin/users/{gone.id}", json={"is_active": False}, headers=admin.headers)
+
+    for headers in (agent.headers, admin.headers):
+        agents = client.get("/agents", headers=headers).json()
+        assert [a["user"]["full_name"] for a in agents] == ["Active Agent"]
+        assert "email" not in agents[0]["user"]
+    assert client.get("/agents", headers=customer.headers).status_code == 403
+    assert client.get("/agents").status_code == 401
+
+
 def test_admin_sees_any_ticket(client, make_user, new_ticket):
     admin = make_user(Role.ADMIN, "admin@example.com")
     alice = make_user(Role.CUSTOMER, "alice@example.com")

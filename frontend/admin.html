@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin dashboard – Support Desk</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header id="topbar" class="topbar"></header>
+  <main class="container">
+    <div id="notice" class="notice" hidden role="alert"></div>
+    <h1>Admin dashboard</h1>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="overview">Overview</button>
+      <button class="tab" data-tab="tickets">Tickets</button>
+      <button class="tab" data-tab="users">Users</button>
+      <button class="tab" data-tab="agents">Agents</button>
+      <button class="tab" data-tab="categories">Categories</button>
+    </div>
+
+    <section id="panel"></section>
+  </main>
+
+  <script src="js/common.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>

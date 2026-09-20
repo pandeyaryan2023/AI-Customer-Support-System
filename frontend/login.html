@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Log in – Support Desk</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="auth-wrap">
+    <h1>Support Desk</h1>
+    <p class="subtitle">AI-Powered Customer Support and Complaint Management</p>
+
+    <div id="notice" class="notice" hidden role="alert"></div>
+
+    <form id="login-form" class="card">
+      <h2>Log in</h2>
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" type="email" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" type="password" autocomplete="current-password" required>
+      </div>
+      <button class="btn btn-block" type="submit">Log in</button>
+      <p class="small muted" style="text-align:center; margin-top:1rem">
+        New customer? <a href="register.html">Create an account</a>
+      </p>
+    </form>
+  </main>
+
+  <script src="js/common.js"></script>
+  <script src="js/login.js"></script>
+</body>
+</html>

@@ -1,0 +1,169 @@
+:root {
+  --bg: #f3f5f9;
+  --surface: #ffffff;
+  --border: #dde2ec;
+  --text: #1c2333;
+  --muted: #5f6b85;
+  --primary: #2352d8;
+  --primary-dark: #1a3fa8;
+  --danger: #c0392b;
+  --success: #1e7e4a;
+  --radius: 8px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+a { color: var(--primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+h1 { font-size: 1.5rem; margin: 0 0 1rem; }
+h2 { font-size: 1.15rem; margin: 0 0 .75rem; }
+h3 { font-size: 1rem; margin: 0 0 .75rem; }
+.muted { color: var(--muted); }
+.small { font-size: .85rem; }
+
+/* ---------- layout ---------- */
+.topbar { background: #16203a; color: #fff; }
+.topbar-inner {
+  max-width: 1180px; margin: 0 auto; padding: .7rem 1rem;
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+}
+.brand { color: #fff; font-weight: 700; font-size: 1.05rem; }
+.brand:hover { text-decoration: none; }
+.topbar-user { display: flex; align-items: center; gap: .6rem; }
+.role-tag {
+  background: rgba(255,255,255,.15); border-radius: 4px; padding: 1px 8px;
+  font-size: .72rem; letter-spacing: .05em;
+}
+
+.container { max-width: 1180px; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
+.grid-2 { display: grid; grid-template-columns: 340px 1fr; gap: 1.25rem; align-items: start; }
+.grid-halves { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: start; }
+.ticket-layout { display: grid; grid-template-columns: 1fr 320px; gap: 1.25rem; align-items: start; }
+/* Grid items are min-width:auto by default, so a wide table inside would stretch
+   the whole page. min-width:0 lets the item shrink and the table scroll instead. */
+.grid-2 > *, .grid-halves > *, .ticket-layout > * { min-width: 0; }
+@media (max-width: 860px) {
+  .grid-2, .grid-halves, .ticket-layout { grid-template-columns: 1fr; }
+}
+
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 1.1rem 1.25rem; margin-bottom: 1.25rem;
+}
+.card > :last-child { margin-bottom: 0; }
+
+/* ---------- auth pages ---------- */
+.auth-wrap { max-width: 420px; margin: 5vh auto 0; padding: 0 1rem; }
+.auth-wrap h1 { text-align: center; margin-bottom: .25rem; }
+.auth-wrap .subtitle { text-align: center; margin: 0 0 1.25rem; color: var(--muted); }
+
+/* ---------- forms ---------- */
+label { display: block; font-weight: 600; font-size: .88rem; margin-bottom: .25rem; }
+.field { margin-bottom: .9rem; }
+input, select, textarea {
+  width: 100%; padding: .5rem .65rem; font: inherit; color: inherit;
+  background: #fff; border: 1px solid #c4cbdb; border-radius: 6px;
+}
+input:focus, select:focus, textarea:focus {
+  outline: 2px solid rgba(35,82,216,.25); border-color: var(--primary);
+}
+textarea { min-height: 96px; resize: vertical; }
+.inline-form { display: flex; gap: .5rem; }
+.inline-form select, .inline-form input { flex: 1; min-width: 0; }
+.filters { display: flex; gap: .75rem; flex-wrap: wrap; align-items: end; margin-bottom: 1rem; }
+.filters .field { margin: 0; min-width: 150px; }
+.check { display: flex; align-items: center; gap: .4rem; font-weight: 500; padding-bottom: .55rem; }
+.check input { width: auto; }
+
+/* ---------- buttons ---------- */
+.btn {
+  display: inline-block; padding: .5rem 1rem; font: inherit; font-weight: 600; cursor: pointer;
+  border: 1px solid var(--primary); background: var(--primary); color: #fff; border-radius: 6px;
+}
+.btn:hover:not(:disabled) { background: var(--primary-dark); text-decoration: none; }
+.btn:disabled { opacity: .55; cursor: not-allowed; }
+.btn-block { width: 100%; }
+.btn-small { padding: .25rem .65rem; font-size: .85rem; }
+.btn-secondary { background: #fff; color: var(--primary); }
+.btn-secondary:hover:not(:disabled) { background: #eef2ff; }
+.btn-danger { background: #fff; color: var(--danger); border-color: var(--danger); }
+.btn-danger:hover:not(:disabled) { background: #fdecea; }
+.btn-ghost { background: transparent; border-color: rgba(255,255,255,.4); color: #fff; padding: .25rem .7rem; }
+.btn-ghost:hover:not(:disabled) { background: rgba(255,255,255,.15); }
+
+/* ---------- notices ---------- */
+.notice { padding: .65rem .9rem; border-radius: 6px; margin-bottom: 1rem; border: 1px solid; }
+.notice-error { background: #fdecea; border-color: #f2b8b1; color: #8a1f14; }
+.notice-success { background: #e8f6ee; border-color: #a9dbc0; color: #14603a; }
+
+/* ---------- tables ---------- */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: .55rem .6rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+th { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); white-space: nowrap; }
+tbody tr:hover { background: #f8f9fd; }
+.empty { color: var(--muted); padding: 1rem 0; margin: 0; }
+
+/* ---------- badges ---------- */
+.badge {
+  display: inline-block; padding: 1px 9px; border-radius: 999px;
+  font-size: .74rem; font-weight: 700; letter-spacing: .02em; white-space: nowrap;
+}
+.status-OPEN { background: #e3edff; color: #1a45b8; }
+.status-IN_PROGRESS { background: #fff1d6; color: #8a5a00; }
+.status-WAITING_FOR_CUSTOMER { background: #f1e6fb; color: #6b2fa3; }
+.status-ESCALATED { background: #fde2e0; color: #a5261a; }
+.status-RESOLVED { background: #dff3e7; color: #17663f; }
+.status-CLOSED { background: #e6e8ee; color: #4b5468; }
+.priority-LOW { background: #e6e8ee; color: #4b5468; }
+.priority-MEDIUM { background: #e3edff; color: #1a45b8; }
+.priority-HIGH { background: #ffe8cc; color: #9a4d00; }
+.priority-URGENT { background: #fde2e0; color: #a5261a; }
+.state-active { background: #dff3e7; color: #17663f; }
+.state-disabled { background: #e6e8ee; color: #4b5468; }
+
+/* ---------- tabs ---------- */
+.tabs { display: flex; gap: .25rem; border-bottom: 2px solid var(--border); margin-bottom: 1.25rem; flex-wrap: wrap; }
+.tab {
+  background: none; border: 0; border-bottom: 3px solid transparent; margin-bottom: -2px;
+  padding: .6rem 1rem; font: inherit; font-weight: 600; color: var(--muted); cursor: pointer;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+/* ---------- ticket page ---------- */
+.ticket-title { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: .5rem; }
+.ticket-title h1 { margin: 0; }
+.meta { display: grid; grid-template-columns: max-content 1fr; gap: .2rem 1rem; margin: 1rem 0; }
+.meta dt { color: var(--muted); }
+.meta dd { margin: 0; }
+.pre { white-space: pre-wrap; word-break: break-word; }
+
+.messages { max-height: 460px; overflow-y: auto; display: flex; flex-direction: column; gap: .75rem; margin-bottom: 1rem; }
+.msg { max-width: 82%; padding: .6rem .8rem; border-radius: 10px; border: 1px solid var(--border); background: #f7f8fc; }
+.msg-staff { align-self: flex-end; background: #e9f0ff; border-color: #c7d6fb; }
+.msg-head { font-size: .78rem; color: var(--muted); margin-bottom: .2rem; }
+.msg-head strong { color: var(--text); }
+
+/* In the narrow side panel, stack the control above its button so long
+   status names such as WAITING FOR CUSTOMER are not cut off. */
+.side-section .inline-form { flex-direction: column; }
+.side-section { padding-bottom: 1rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border); }
+.side-section:last-child { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+
+/* ---------- statistics ---------- */
+.stat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1rem; margin-bottom: 1.25rem; }
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; }
+.stat-card .num { font-size: 1.9rem; font-weight: 700; line-height: 1.1; }
+.bar-row { display: grid; grid-template-columns: minmax(0, 170px) 1fr 2rem; gap: .6rem; align-items: center; margin-bottom: .45rem; }
+.bar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar { background: #edf0f7; border-radius: 4px; height: 12px; overflow: hidden; }
+.bar > span { display: block; height: 100%; background: var(--primary); }
+.bar-count { text-align: right; font-weight: 600; }

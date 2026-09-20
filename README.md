@@ -10,8 +10,8 @@ BCA-507 Minor Project. Customers raise complaints, support agents resolve them, 
 | Backend: FastAPI + PostgreSQL + SQLAlchemy + Alembic | Done |
 | Authentication (bcrypt + JWT) and role-based access | Done |
 | Core ticket management (customer / agent / admin APIs) | Done |
-| Automated tests (pytest) | 34 passing (see [docs/test-cases.md](docs/test-cases.md)) |
-| Frontend (HTML / CSS / JavaScript) | Not started |
+| Automated tests (pytest) | 35 passing (see [docs/test-cases.md](docs/test-cases.md)) |
+| Frontend (HTML / CSS / JavaScript) | Done — customer, agent and admin interfaces |
 | AI analysis and response assistance | Not started |
 | Knowledge base / RAG | Not started |
 | AWS and Amazon Connect | Not started |
@@ -31,6 +31,8 @@ alembic upgrade head                      # creates the tables
 python create_admin.py                    # creates the first admin account
 uvicorn app.main:app --reload             # http://127.0.0.1:8000/docs
 ```
+
+Then open **http://127.0.0.1:8000/app/** for the web interface. FastAPI serves the frontend, so one server runs everything.
 
 - `GET /health` checks the API, `GET /health/db` checks the database connection.
 - Interactive API docs (Swagger): http://127.0.0.1:8000/docs. Use **Authorize** with the admin email as the username.

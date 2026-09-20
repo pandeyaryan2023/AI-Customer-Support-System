@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent dashboard – Support Desk</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header id="topbar" class="topbar"></header>
+  <main class="container">
+    <div id="notice" class="notice" hidden role="alert"></div>
+    <h1>Agent dashboard</h1>
+
+    <div class="tabs">
+      <button class="tab active" data-queue="mine">My tickets</button>
+      <button class="tab" data-queue="unassigned">Unassigned queue</button>
+    </div>
+
+    <section class="card">
+      <div class="filters">
+        <div class="field">
+          <label for="filter-status">Status</label>
+          <select id="filter-status"><option value="">All</option></select>
+        </div>
+        <div class="field">
+          <label for="filter-priority">Priority</label>
+          <select id="filter-priority"><option value="">All</option></select>
+        </div>
+      </div>
+      <div id="tickets"></div>
+    </section>
+  </main>
+
+  <script src="js/common.js"></script>
+  <script src="js/agent.js"></script>
+</body>
+</html>

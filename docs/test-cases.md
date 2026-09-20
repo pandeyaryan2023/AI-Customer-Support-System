@@ -1,7 +1,28 @@
 # Test cases
 
-Automated tests: `cd backend; pytest`. Last run: **34 passed** (2026-09-20), using in-memory SQLite.
-Not yet covered: PostgreSQL-specific behaviour, frontend, AI, AWS (none built yet).
+Automated tests: `cd backend; pytest`. Last run: **35 passed** (2026-09-20), using in-memory SQLite.
+Not yet covered by pytest: PostgreSQL-specific behaviour, AI, AWS (none built yet).
+
+## Browser walkthrough (manual script, run once in Microsoft Edge)
+
+Driven end to end against the real UI on 2026-09-20; all steps passed.
+
+| Case | Expected | Result |
+|---|---|---|
+| Register with mismatched passwords, then matching | Error shown; then account created | Pass |
+| Login with wrong password | "Incorrect email or password" | Pass |
+| Customer raises a complaint with a category | Appears in list as OPEN / MEDIUM | Pass |
+| Customer opens own ticket, sends a message | No "Manage ticket" panel; message sent | Pass |
+| Another customer opens that ticket URL directly | "Ticket not found" | Pass |
+| Agent's own list vs unassigned queue; claim | Empty; queue shows it; claim works | Pass |
+| Agent escalates with a 2-character reason | Rejected (422) | Pass |
+| Agent replies | Status becomes IN_PROGRESS | Pass |
+| Agent sets priority URGENT, escalates with a reason | ESCALATED plus "[Escalated]" message | Pass |
+| Agent resolves then closes | Closed ticket refuses further messages | Pass |
+| Admin creates duplicate category ("delivery" vs "Delivery") | "already exists" | Pass |
+| Admin creates an agent | Agent listed | Pass |
+| Admin disables a customer, customer tries to log in, admin re-enables | Login refused ("disabled"); works after re-enabling | Pass |
+| Every page at 400px width | No sideways scrolling | Pass |
 
 ## Authentication (`tests/test_auth.py`, 9 tests)
 
