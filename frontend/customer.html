@@ -3,46 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>My complaints – Support Desk</title>
+  <title>Support Desk · Customer</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
-  <header id="topbar" class="topbar"></header>
-  <main class="container">
-    <div id="notice" class="notice" hidden role="alert"></div>
-    <h1>My complaints</h1>
-
-    <div class="grid-2">
-      <form id="new-ticket" class="card">
-        <h2>Raise a new complaint</h2>
-        <div class="field">
-          <label for="title">Title</label>
-          <input id="title" type="text" minlength="5" maxlength="200" placeholder="e.g. Laptop not charging" required>
-        </div>
-        <div class="field">
-          <label for="category">Category (optional)</label>
-          <select id="category"><option value="">Not sure / other</option></select>
-        </div>
-        <div class="field">
-          <label for="description">Describe the problem</label>
-          <textarea id="description" minlength="10" maxlength="5000" required></textarea>
-        </div>
-        <button class="btn btn-block" type="submit">Submit complaint</button>
-      </form>
-
-      <section class="card">
-        <div class="filters">
-          <div class="field">
-            <label for="filter-status">Show</label>
-            <select id="filter-status"><option value="">All statuses</option></select>
-          </div>
-        </div>
-        <div id="tickets"></div>
-      </section>
-    </div>
-  </main>
-
+  <!-- The application shell is built by ui.js so every page shares one layout. -->
+  <script src="js/ui.js"></script>
   <script src="js/common.js"></script>
   <script src="js/customer.js"></script>
 </body>

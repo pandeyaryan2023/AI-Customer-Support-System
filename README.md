@@ -11,7 +11,7 @@ BCA-507 Minor Project. Customers raise complaints, support agents resolve them, 
 | Authentication (bcrypt + JWT) and role-based access | Done |
 | Core ticket management (customer / agent / admin APIs) | Done |
 | Automated tests (pytest) | 35 passing (see [docs/test-cases.md](docs/test-cases.md)) |
-| Frontend (HTML / CSS / JavaScript) | Done — customer, agent and admin interfaces |
+| Frontend (HTML / CSS / JavaScript) | Done — customer, agent and admin interfaces, with a token-based design system ([docs/design-system.md](docs/design-system.md)) |
 | AI analysis and response assistance | Not started |
 | Knowledge base / RAG | Not started |
 | AWS and Amazon Connect | Not started |
@@ -60,6 +60,8 @@ Tests use an in-memory SQLite database, so they never touch your PostgreSQL data
 | `backend/tests` | Automated tests |
 | `python-prototype` | Original CLI prototype |
 | `docs` | Project documentation |
-| `frontend` | Reserved for the web interface |
+| `frontend/css` | `tokens.css` (design tokens) and `app.css` (components) |
+| `frontend/js` | `ui.js` (components), `common.js` (API and session), one script per page |
+| `frontend/fonts` | Self-hosted Plus Jakarta Sans, so the app works offline |
 
 See [docs/database.md](docs/database.md) and [docs/api.md](docs/api.md).

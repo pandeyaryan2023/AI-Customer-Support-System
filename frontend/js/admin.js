@@ -1,225 +1,332 @@
 "use strict";
 
-const session = requireRole("ADMIN");
+/* Administration workspace. Five views, one per sidebar item.
+   Every call here is one the previous admin page already made. */
 
-// Each tab is a function that fills the panel with its own content.
-const TABS = {
-  overview: showOverview,
-  tickets: showTickets,
-  users: showUsers,
-  agents: showAgents,
-  categories: showCategories,
+const session = requireRole("ADMIN");
+let shell = null;
+
+const VIEWS = {
+  dashboard: renderDashboard,
+  tickets: renderTickets,
+  users: renderUsers,
+  agents: renderAgents,
+  categories: renderCategories,
 };
 
 if (session) init();
 
 function init() {
-  renderNav(session);
-  document.querySelectorAll(".tab").forEach((tab) =>
-    tab.addEventListener("click", () => openTab(tab.dataset.tab)));
-  openTab("overview");
+  shell = mountShell(session, { active: currentView(), onNavigate: render });
+  window.addEventListener("hashchange", () => render(currentView()));
+  render(currentView());
 }
 
-function openTab(name) {
-  clearNotice();
-  document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === name));
-  // Clear at once: otherwise the previous tab stays on screen while the new data loads.
-  panel(h("p", { class: "empty" }, "Loading…"));
-  TABS[name]();
+function currentView() {
+  const id = location.hash.replace("#/", "");
+  return VIEWS[id] ? id : "dashboard";
 }
 
-function panel(...content) {
-  document.getElementById("panel").replaceChildren(...content);
+function render(view) {
+  shell.setActive(view);
+  VIEWS[view]();
 }
 
-let fieldCounter = 0;
-
-/** A labelled form field. The label is linked to the control so clicking it focuses the input. */
-function field(label, control) {
-  fieldCounter += 1;
-  control.id = `field-${fieldCounter}`;
-  return h("div", { class: "field" }, h("label", { for: control.id }, label), control);
+function panelCard(title, body, action) {
+  return h("section", { class: "card" },
+    h("div", { class: "card-head" },
+      h("h2", { class: "section-title" }, title),
+      action ? h("span", { class: "row-end" }, action) : null),
+    body);
 }
 
-/** Run a load function; show the error banner if it fails. */
-async function attempt(action) {
-  try {
-    await action();
-  } catch (error) {
-    notify(error.message);
-  }
+function tableOrEmpty(rows, headings, empty) {
+  return rows.length === 0 ? empty : tableFrom(headings, rows);
 }
 
-/* ---------- Overview ---------- */
+/* ---------------------------------------------------------- dashboard */
 
-function showOverview() {
-  attempt(async () => {
-    const stats = await api("/admin/stats");
-    const cards = h("div", { class: "stat-cards" },
-      statCard(stats.total_tickets, "Total tickets"),
-      statCard(stats.unassigned_tickets, "Unassigned tickets"),
-      statCard(stats.users_by_role.CUSTOMER, "Customers"),
-      statCard(stats.users_by_role.AGENT, "Agents"));
+function renderDashboard() {
+  shell.setHeader("Dashboard", { subtitle: "How the support desk is running right now." });
 
-    panel(cards,
-      h("div", { class: "grid-halves" },
-        h("section", { class: "card" }, h("h2", {}, "Tickets by status"), bars(stats.tickets_by_status, stats.total_tickets)),
-        h("section", { class: "card" }, h("h2", {}, "Tickets by priority"), bars(stats.tickets_by_priority, stats.total_tickets))));
-  });
+  const stats = h("div", {}, skeletonStats(4));
+  const charts = h("div", {});
+  const latest = h("div", {});
+  shell.body.replaceChildren(h("div", { class: "stack" }, stats, charts, latest));
+
+  (async () => {
+    let summary, tickets;
+    try {
+      [summary, tickets] = await Promise.all([api("/admin/stats"), api("/tickets")]);
+    } catch (error) {
+      stats.replaceChildren(emptyState({ icon: "alert", title: "Could not load statistics", text: error.message }));
+      return;
+    }
+
+    stats.replaceChildren(h("div", { class: "stat-grid" },
+      statTile("Total tickets", summary.total_tickets, true),
+      statTile("Unassigned", summary.unassigned_tickets),
+      statTile("Customers", summary.users_by_role.CUSTOMER),
+      statTile("Agents", summary.users_by_role.AGENT)));
+
+    charts.replaceChildren(h("div", { class: "ticket-grid" },
+      panelCard("Tickets by status",
+        h("div", { class: "card-pad" }, distribution(summary.tickets_by_status, summary.total_tickets))),
+      panelCard("Tickets by priority",
+        h("div", { class: "card-pad" }, distribution(summary.tickets_by_priority, summary.total_tickets)))));
+
+    latest.replaceChildren(panelCard("Latest tickets",
+      tickets.length === 0
+        ? emptyState({ icon: "folder", title: "No tickets yet", text: "Nothing has been raised on the system so far." })
+        : ticketTable(tickets.slice(0, 5), { showCustomer: true, showAgent: true }),
+      tickets.length ? h("a", { class: "btn btn-secondary btn-sm", href: "#/tickets" }, "View all") : null));
+  })();
 }
 
-function statCard(number, label) {
-  return h("div", { class: "stat-card" }, h("div", { class: "num" }, String(number)), h("div", { class: "muted" }, label));
-}
+/* ---------------------------------------------------------- tickets */
 
-function bars(counts, total) {
-  return h("div", {}, Object.entries(counts).map(([name, count]) => {
-    const percent = total ? Math.round((count / total) * 100) : 0;
-    return h("div", { class: "bar-row" },
-      h("span", { class: "bar-label", title: labelOf(name) }, labelOf(name)),
-      h("div", { class: "bar" }, h("span", { style: `width:${percent}%` })),
-      h("span", { class: "bar-count" }, String(count)));
-  }));
-}
+function renderTickets() {
+  shell.setHeader("Tickets", { subtitle: "Every ticket on the system." });
 
-/* ---------- Tickets ---------- */
-
-function showTickets() {
-  const status = h("select", {}, option("", "All"), STATUSES.map((s) => option(s, labelOf(s))));
-  const priority = h("select", {}, option("", "All"), PRIORITIES.map((p) => option(p, p)));
+  const statusSelect = h("select", {}, option("", "All statuses"), STATUSES.map((s) => option(s, titleCase(s))));
+  const prioritySelect = h("select", {}, option("", "All priorities"), PRIORITIES.map((p) => option(p, titleCase(p))));
   const unassigned = h("input", { type: "checkbox" });
   const results = h("div", {});
 
-  const reload = () => attempt(async () => {
-    const tickets = await api(`/tickets${queryString({ status: status.value, priority: priority.value, unassigned: unassigned.checked })}`);
-    results.replaceChildren(ticketTable(tickets, { showCustomer: true, showAgent: true }));
-  });
-  [status, priority, unassigned].forEach((control) => control.addEventListener("change", reload));
-
-  panel(h("section", { class: "card" },
-    h("div", { class: "filters" },
-      field("Status", status), field("Priority", priority),
-      h("label", { class: "check" }, unassigned, "Unassigned only")),
-    results));
-  reload();
-}
-
-/* ---------- Users ---------- */
-
-function showUsers() {
-  const role = h("select", {}, option("", "All roles"), ["CUSTOMER", "AGENT", "ADMIN"].map((r) => option(r, r)));
-  const results = h("div", {});
-
-  const reload = () => attempt(async () => {
-    const users = await api(`/admin/users${queryString({ role: role.value })}`);
-    results.replaceChildren(userTable(users, reload));
-  });
-  role.addEventListener("change", reload);
-
-  panel(h("section", { class: "card" }, h("div", { class: "filters" }, field("Role", role)), results));
-  reload();
-}
-
-function userTable(users, reload) {
-  const rows = users.map((u) => {
-    let action = h("span", { class: "muted small" }, "(you)");
-    if (u.id !== session.id) {
-      action = h("button", { class: `btn btn-small ${u.is_active ? "btn-danger" : "btn-secondary"}` }, u.is_active ? "Disable" : "Enable");
-      action.addEventListener("click", () =>
-        guarded(action, async () => {
-          await api(`/admin/users/${u.id}`, { method: "PATCH", json: { is_active: !u.is_active } });
-          await reload();
-        }));
+  const load = () => loadInto(results, skeletonRows(6), async () => {
+    const tickets = await api(`/tickets${queryString({
+      status: statusSelect.value,
+      priority: prioritySelect.value,
+      unassigned: unassigned.checked,
+    })}`);
+    shell.setNavCount("tickets", tickets.length || "");
+    if (tickets.length === 0) {
+      return emptyState({
+        icon: "search",
+        title: "No tickets match these filters",
+        text: "Try clearing the filters to see everything.",
+        action: h("button", {
+          class: "btn btn-secondary", type: "button",
+          onclick: () => {
+            statusSelect.value = ""; prioritySelect.value = ""; unassigned.checked = false; load();
+          },
+        }, "Clear filters"),
+      });
     }
-    return h("tr", {},
-      h("td", {}, String(u.id)), h("td", {}, u.full_name), h("td", {}, u.email), h("td", {}, u.role),
-      h("td", {}, h("span", { class: `badge ${u.is_active ? "state-active" : "state-disabled"}` }, u.is_active ? "Active" : "Disabled")),
-      h("td", { class: "small muted" }, fmtDate(u.created_at)),
-      h("td", {}, action));
+    return ticketTable(tickets, { showCustomer: true, showAgent: true });
   });
-  return simpleTable(["ID", "Name", "Email", "Role", "Status", "Joined", ""], rows);
+
+  [statusSelect, prioritySelect, unassigned].forEach((c) => c.addEventListener("change", load));
+
+  shell.body.replaceChildren(h("section", { class: "card" },
+    h("div", { class: "toolbar" },
+      field("Status", statusSelect),
+      field("Priority", prioritySelect),
+      h("label", { class: "checkbox", style: "padding-bottom:9px" }, unassigned, "Unassigned only")),
+    results));
+  load();
 }
 
-function simpleTable(headings, rows) {
-  if (rows.length === 0) return h("p", { class: "empty" }, "Nothing to show yet.");
-  return h("div", { class: "table-wrap" },
-    h("table", {}, h("thead", {}, h("tr", {}, headings.map((t) => h("th", {}, t)))), h("tbody", {}, rows)));
-}
+/* ---------------------------------------------------------- users */
 
-/* ---------- Agents ---------- */
+function renderUsers() {
+  shell.setHeader("Users", { subtitle: "Everyone with an account on the system." });
 
-function showAgents() {
-  const name = h("input", { type: "text", minlength: "2", required: true });
-  const email = h("input", { type: "email", required: true });
-  const password = h("input", { type: "password", minlength: "8", autocomplete: "new-password", required: true });
-  const department = h("input", { type: "text", maxlength: "100", placeholder: "e.g. Billing" });
-  const form = h("form", { class: "card" },
-    h("h2", {}, "Add an agent"),
-    field("Full name", name), field("Email", email), field("Temporary password", password), field("Department (optional)", department),
-    h("button", { class: "btn btn-block", type: "submit" }, "Create agent"));
+  const roleSelect = h("select", {}, option("", "All roles"),
+    ["CUSTOMER", "AGENT", "ADMIN"].map((r) => option(r, titleCase(r))));
   const results = h("div", {});
 
-  const reload = () => attempt(async () => {
-    const agents = await api("/admin/agents");
-    results.replaceChildren(simpleTable(["ID", "Name", "Email", "Department", "Status"], agents.map((a) => h("tr", {},
-      h("td", {}, String(a.id)), h("td", {}, a.user.full_name), h("td", {}, a.user.email), h("td", {}, a.department || "—"),
-      h("td", {}, h("span", { class: `badge ${a.user.is_active ? "state-active" : "state-disabled"}` }, a.user.is_active ? "Active" : "Disabled"))))));
+  const load = () => loadInto(results, skeletonRows(6), async () => {
+    const users = await api(`/admin/users${queryString({ role: roleSelect.value })}`);
+    shell.setNavCount("users", users.length || "");
+
+    const rows = users.map((user) => {
+      let action;
+      if (user.id === session.id) {
+        action = h("span", { class: "meta" }, "That's you");
+      } else {
+        action = h("button", {
+          class: `btn btn-sm ${user.is_active ? "btn-danger" : "btn-secondary"}`,
+          type: "button",
+        }, user.is_active ? "Disable" : "Enable");
+        action.addEventListener("click", () =>
+          guarded(action, async () => {
+            await api(`/admin/users/${user.id}`, { method: "PATCH", json: { is_active: !user.is_active } });
+            toast(`${user.full_name} ${user.is_active ? "disabled" : "enabled"}.`, "success");
+            await load();
+          }));
+      }
+      return h("tr", {},
+        h("td", {}, identity(user.full_name, user.email)),
+        h("td", {}, roleBadge(user.role)),
+        h("td", {}, activeBadge(user.is_active)),
+        h("td", { class: "meta" }, fmtDay(user.created_at)),
+        h("td", { class: "col-actions" }, h("span", { class: "row-action" }, action)));
+    });
+
+    return tableOrEmpty(rows,
+      ["User", "Role", "Status", "Joined", { label: "", align: "right" }],
+      emptyState({ icon: "users", title: "No users with that role", text: "Try a different role filter." }));
   });
+
+  roleSelect.addEventListener("change", load);
+
+  shell.body.replaceChildren(h("section", { class: "card" },
+    h("div", { class: "toolbar" }, field("Role", roleSelect)),
+    results));
+  load();
+}
+
+/* ---------------------------------------------------------- agents */
+
+function renderAgents() {
+  const addButton = h("button", { class: "btn", type: "button", onclick: () => openAgentSheet(load) },
+    icon("plus"), "Add agent");
+  shell.setHeader("Agents", { subtitle: "Support staff who can be assigned tickets.", actions: [addButton] });
+
+  const results = h("div", {});
+  shell.body.replaceChildren(h("section", { class: "card" }, results));
+
+  function load() {
+    return loadInto(results, skeletonRows(4), async () => {
+      const agents = await api("/admin/agents");
+      shell.setNavCount("agents", agents.length || "");
+
+      const rows = agents.map((agent) => h("tr", {},
+        h("td", {}, identity(agent.user.full_name, agent.user.email)),
+        h("td", {}, agent.department || h("span", { class: "muted" }, "—")),
+        h("td", {}, activeBadge(agent.user.is_active)),
+        h("td", { class: "meta" }, fmtDay(agent.user.created_at))));
+
+      return tableOrEmpty(rows,
+        ["Agent", "Department", "Status", "Joined"],
+        emptyState({
+          icon: "headset",
+          title: "No agents yet",
+          text: "Create an agent account so tickets can be assigned to someone.",
+          action: h("button", { class: "btn", type: "button", onclick: () => openAgentSheet(load) }, "Add agent"),
+        }));
+    });
+  }
+  load();
+}
+
+function openAgentSheet(onDone) {
+  const name = h("input", { type: "text", minlength: "2", maxlength: "100", placeholder: "Ravi Kumar", required: true });
+  const email = h("input", { type: "email", placeholder: "ravi@example.com", required: true });
+  const password = h("input", { type: "password", minlength: "8", autocomplete: "new-password", required: true });
+  const department = h("input", { type: "text", maxlength: "100", placeholder: "Billing" });
+  const submit = h("button", { class: "btn", type: "submit", form: "agent-form" }, "Create agent");
+
+  const form = h("form", { id: "agent-form" },
+    field("Full name", name),
+    field("Email", email, { hint: "The agent signs in with this address." }),
+    field("Temporary password", password, { hint: "At least 8 characters. Ask them to change it after first login." }),
+    field("Department", department, { hint: "Optional — shown beside their name when assigning tickets." }));
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    guarded(event.submitter, async () => {
+    guarded(submit, async () => {
       const agent = await api("/admin/agents", {
         method: "POST",
-        json: { full_name: name.value, email: email.value.trim(), password: password.value, department: department.value.trim() || null },
+        json: {
+          full_name: name.value,
+          email: email.value.trim(),
+          password: password.value,
+          department: department.value.trim() || null,
+        },
       });
-      form.reset();
-      await reload();
-      notify(`Agent ${agent.user.full_name} created.`, "success");
+      closeSheet();
+      toast(`${agent.user.full_name} can now sign in as an agent.`, "success");
+      onDone();
     });
   });
 
-  panel(h("div", { class: "grid-2" }, form, h("section", { class: "card" }, h("h2", {}, "Agents"), results)));
-  reload();
+  openSheet({
+    title: "Add an agent",
+    body: form,
+    footer: [h("button", { class: "btn btn-secondary", type: "button", onclick: closeSheet }, "Cancel"), submit],
+  });
 }
 
-/* ---------- Categories ---------- */
+/* ---------------------------------------------------------- categories */
 
-function showCategories() {
-  const name = h("input", { type: "text", minlength: "2", maxlength: "100", required: true });
-  const description = h("input", { type: "text", maxlength: "255" });
-  const form = h("form", { class: "card" },
-    h("h2", {}, "Add a category"),
-    field("Name", name), field("Description (optional)", description),
-    h("button", { class: "btn btn-block", type: "submit" }, "Create category"));
-  const results = h("div", {});
-
-  const reload = () => attempt(async () => {
-    const categories = await api("/admin/categories");
-    results.replaceChildren(simpleTable(["Name", "Description", "Status", ""], categories.map((c) => {
-      const toggle = h("button", { class: `btn btn-small ${c.is_active ? "btn-danger" : "btn-secondary"}` }, c.is_active ? "Deactivate" : "Activate");
-      toggle.addEventListener("click", () =>
-        guarded(toggle, async () => {
-          await api(`/admin/categories/${c.id}`, { method: "PATCH", json: { is_active: !c.is_active } });
-          await reload();
-        }));
-      return h("tr", {},
-        h("td", {}, c.name), h("td", { class: "muted" }, c.description || "—"),
-        h("td", {}, h("span", { class: `badge ${c.is_active ? "state-active" : "state-disabled"}` }, c.is_active ? "Active" : "Inactive")),
-        h("td", {}, toggle));
-    })));
+function renderCategories() {
+  const addButton = h("button", { class: "btn", type: "button", onclick: () => openCategorySheet(load) },
+    icon("plus"), "Add category");
+  shell.setHeader("Categories", {
+    subtitle: "What customers can file a complaint under.",
+    actions: [addButton],
   });
+
+  const results = h("div", {});
+  shell.body.replaceChildren(h("section", { class: "card" }, results));
+
+  function load() {
+    return loadInto(results, skeletonRows(4), async () => {
+      const categories = await api("/admin/categories");
+      shell.setNavCount("categories", categories.length || "");
+
+      const rows = categories.map((category) => {
+        const toggle = h("button", {
+          class: `btn btn-sm ${category.is_active ? "btn-danger" : "btn-secondary"}`,
+          type: "button",
+        }, category.is_active ? "Deactivate" : "Activate");
+        toggle.addEventListener("click", () =>
+          guarded(toggle, async () => {
+            await api(`/admin/categories/${category.id}`, {
+              method: "PATCH", json: { is_active: !category.is_active },
+            });
+            toast(`${category.name} ${category.is_active ? "deactivated" : "activated"}.`, "success");
+            await load();
+          }));
+
+        return h("tr", {},
+          h("td", { class: "strong" }, category.name),
+          h("td", { class: "muted" }, category.description || "—"),
+          h("td", {}, h("span", { class: `badge ${category.is_active ? "state-active" : "state-disabled"}` },
+            category.is_active ? "Active" : "Inactive")),
+          h("td", { class: "col-actions" }, h("span", { class: "row-action" }, toggle)));
+      });
+
+      return tableOrEmpty(rows,
+        ["Category", "Description", "Status", { label: "", align: "right" }],
+        emptyState({
+          icon: "tags",
+          title: "No categories yet",
+          text: "Add a category so complaints can be sorted by type.",
+          action: h("button", { class: "btn", type: "button", onclick: () => openCategorySheet(load) }, "Add category"),
+        }));
+    });
+  }
+  load();
+}
+
+function openCategorySheet(onDone) {
+  const name = h("input", { type: "text", minlength: "2", maxlength: "100", placeholder: "Billing", required: true });
+  const description = h("input", { type: "text", maxlength: "255", placeholder: "Payments, refunds and invoices" });
+  const submit = h("button", { class: "btn", type: "submit", form: "category-form" }, "Create category");
+
+  const form = h("form", { id: "category-form" },
+    field("Name", name),
+    field("Description", description, { hint: "Optional — helps customers pick the right one." }));
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    guarded(event.submitter, async () => {
-      await api("/admin/categories", { method: "POST", json: { name: name.value, description: description.value.trim() || null } });
-      form.reset();
-      await reload();
-      notify("Category created.", "success");
+    guarded(submit, async () => {
+      await api("/admin/categories", {
+        method: "POST",
+        json: { name: name.value, description: description.value.trim() || null },
+      });
+      closeSheet();
+      toast("Category created.", "success");
+      onDone();
     });
   });
 
-  panel(h("div", { class: "grid-2" }, form, h("section", { class: "card" }, h("h2", {}, "Categories"), results)));
-  reload();
+  openSheet({
+    title: "Add a category",
+    body: form,
+    footer: [h("button", { class: "btn btn-secondary", type: "button", onclick: closeSheet }, "Cancel"), submit],
+  });
 }

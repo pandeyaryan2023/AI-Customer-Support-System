@@ -4,7 +4,7 @@ const existing = getSession();
 if (existing) location.replace(DASHBOARD[existing.role]);
 
 if (new URLSearchParams(location.search).get("registered")) {
-  notify("Account created. Please log in.", "success");
+  toast("Account created. Log in to continue.", "success");
 }
 
 document.getElementById("login-form").addEventListener("submit", (event) => {

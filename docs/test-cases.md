@@ -3,9 +3,18 @@
 Automated tests: `cd backend; pytest`. Last run: **35 passed** (2026-09-20), using in-memory SQLite.
 Not yet covered by pytest: PostgreSQL-specific behaviour, AI, AWS (none built yet).
 
-## Browser walkthrough (manual script, run once in Microsoft Edge)
+## Browser walkthrough (scripted, Microsoft Edge)
 
-Driven end to end against the real UI on 2026-09-20; all steps passed.
+Re-run after the visual redesign on 2026-09-20: **29 checks, all passed, 0 console errors.**
+The only non-2xx server responses were the five deliberate negative tests
+(wrong password 401, foreign ticket 404, short escalation reason 422, duplicate category 409,
+disabled account 403).
+
+Added by the redesign run: complaint creation through the slide-over panel, the lifecycle
+pipeline, a customer being redirected away from `admin.html`, logout, Escape closing the
+slide-over, the mobile drawer, and no horizontal overflow at 1440 / 1280 / 1024 / 768 / 480 / 390 px.
+
+The table below lists the original fourteen cases; all still pass.
 
 | Case | Expected | Result |
 |---|---|---|

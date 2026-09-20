@@ -1,0 +1,127 @@
+/* ============================================================
+   DESIGN TOKENS
+   The single source of truth for the visual language.
+   Nothing in app.css should use a raw hex, pixel or duration
+   value that could live here instead.
+   ============================================================ */
+
+/* ---------- typeface (self-hosted so the app works offline) ---------- */
+
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 200 800;            /* one variable file covers every weight */
+  font-display: swap;
+  src: url("../fonts/plus-jakarta-sans-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("../fonts/plus-jakarta-sans-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root {
+  /* ---------- colour: chrome ----------
+     The brand is a deep ink, not a hue. That leaves the whole colour
+     range free to carry meaning (status and priority) instead of identity. */
+  --ink: #131a26;
+  --ink-soft: #1e2938;
+  --ink-line: #2b3646;
+  --canvas: #f5f6f8;
+  --surface: #ffffff;
+  --surface-sunken: #fafbfc;
+  --line: #e4e7ec;
+  --line-strong: #d3d8e0;
+  --text: #1f2937;
+  --text-muted: #667085;
+  --text-inverse: #ffffff;
+  --text-inverse-muted: #9aa6b8;
+
+  /* ---------- colour: action ----------
+     Used only for primary actions, active navigation and focus rings.
+     No status uses teal, so an action can never be mistaken for a state. */
+  --accent: #0e7c86;
+  --accent-hover: #0a616a;
+  --accent-soft: #e6f4f5;
+  --accent-ring: rgba(14, 124, 134, 0.28);
+
+  /* ---------- colour: semantic ----------
+     Badges are pale tints; buttons are solid fills. That difference,
+     not hue, is what keeps ten meanings legible side by side. */
+  --blue-bg: #e7efff;      --blue-fg: #1a45b8;    --blue-solid: #2f5fd0;
+  --amber-bg: #fdf0d5;     --amber-fg: #8a5a00;   --amber-solid: #c98a15;
+  --violet-bg: #f0e9fc;    --violet-fg: #6b2fa3;  --violet-solid: #8a52c4;
+  --red-bg: #fde5e2;       --red-fg: #a5261a;     --red-solid: #cf3a2a;
+  --green-bg: #e0f3e8;     --green-fg: #17663f;   --green-solid: #23875a;
+  --slate-bg: #eceef2;     --slate-fg: #4b5468;   --slate-solid: #6b7488;
+
+  /* ---------- typography ---------- */
+  --font: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  --fs-stat: 30px;     --lh-stat: 1.1;
+  --fs-title: 24px;    --lh-title: 1.25;
+  --fs-section: 16px;  --lh-section: 1.35;
+  --fs-body: 14px;     --lh-body: 1.55;
+  --fs-label: 13px;    --lh-label: 1.4;
+  --fs-meta: 12px;     --lh-meta: 1.4;
+
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  /* ---------- spacing (4px base) ---------- */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 20px;
+  --s6: 24px;
+  --s8: 32px;
+  --s12: 48px;
+
+  /* ---------- radius ---------- */
+  --r-sm: 6px;      /* inputs, small buttons */
+  --r-md: 10px;     /* cards, panels */
+  --r-lg: 14px;     /* drawers, dialogs */
+  --r-full: 999px;  /* badges, avatars */
+
+  /* ---------- elevation ----------
+     Three levels, each with a meaning. Flat content gets a border only. */
+  --shadow-raised: 0 1px 3px rgba(16, 24, 40, 0.08);
+  --shadow-floating: 0 8px 24px rgba(16, 24, 40, 0.12);
+  --shadow-dialog: 0 16px 48px rgba(16, 24, 40, 0.18);
+
+  /* ---------- motion ---------- */
+  --t-fast: 120ms;
+  --t-base: 160ms;
+  --t-slow: 200ms;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ---------- layout ---------- */
+  --sidebar-w: 240px;
+  --header-h: 68px;
+  --content-max: 1280px;
+  --z-drawer: 60;
+  --z-dialog: 70;
+  --z-toast: 80;
+}
+
+/* Honour the operating-system setting: no movement for people who ask for none. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --t-fast: 0ms;
+    --t-base: 0ms;
+    --t-slow: 0ms;
+  }
+}
