@@ -1,3 +1,4 @@
+import logging
 import re
 import uuid
 from pathlib import Path
@@ -7,7 +8,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models import Document, User
+from app.models import Document, DocumentStatus, User
+from app.services import text_extraction
+from app.services.text_extraction import ExtractionError
+
+logger = logging.getLogger(__name__)
 
 # The ONLY file types accepted. The extension decides the type we store,
 # never the Content-Type header, which the uploader controls.
@@ -25,7 +30,7 @@ def _storage_dir() -> Path:
 
 
 def storage_path(document: Document) -> Path:
-    """Where this document's bytes live on disk (Phase 2 will read from here)."""
+    """Where this document's bytes live on disk. Extraction reads from here."""
     return Path(settings.storage_dir) / document.stored_filename
 
 
@@ -101,6 +106,60 @@ def save_document(db: Session, admin: User, title: str, upload: UploadFile) -> D
         path.unlink(missing_ok=True)
         raise
     db.refresh(document)
+
+    # The document is saved (status PENDING) BEFORE extraction runs. Whatever happens
+    # next, the original is kept and can be extracted again later.
+    return extract_document(db, document)
+
+
+def extract_document(db: Session, document: Document) -> Document:
+    """Extract a stored document's text and record the result.
+
+    A bad file never raises: it ends as FAILED with a reason, and the file itself is
+    left untouched. Running it again (a retry) simply overwrites the previous result.
+    """
+    try:
+        result = text_extraction.extract_text(storage_path(document))
+    except ExtractionError as error:
+        _record_failure(document, str(error))
+    except Exception:
+        # Anything the extractor did not foresee. One strange file must not turn
+        # into a server error; the full traceback goes to the server log instead.
+        logger.exception("Unexpected error extracting text from document %s", document.id)
+        _record_failure(document, "Unexpected error while reading the file")
+    else:
+        document.status = DocumentStatus.EXTRACTED
+        document.extracted_text = result.text
+        document.page_count = result.page_count
+        document.char_count = len(result.text)
+        document.extraction_error = None
+    db.commit()
+    db.refresh(document)
+    return document
+
+
+def _record_failure(document: Document, reason: str) -> None:
+    document.status = DocumentStatus.FAILED
+    document.extracted_text = None
+    document.page_count = None
+    document.char_count = None
+    document.extraction_error = reason[:300]
+
+
+def get_document(db: Session, document_id: int) -> Document:
+    document = db.get(Document, document_id)
+    if document is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Document not found")
+    return document
+
+
+def get_text(db: Session, document_id: int) -> Document:
+    document = get_document(db, document_id)
+    if document.status != DocumentStatus.EXTRACTED:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"This document has no extracted text (status {document.status})",
+        )
     return document
 
 
@@ -110,9 +169,7 @@ def list_documents(db: Session) -> list[Document]:
 
 
 def delete_document(db: Session, document_id: int) -> None:
-    document = db.get(Document, document_id)
-    if document is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Document not found")
+    document = get_document(db, document_id)
     path = storage_path(document)
     db.delete(document)
     db.commit()

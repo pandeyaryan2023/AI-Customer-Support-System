@@ -6,6 +6,7 @@ psycopg[binary]
 pydantic-settings
 email-validator
 python-multipart
+pypdf
 PyJWT
 bcrypt
 anthropic

@@ -10,8 +10,9 @@ BCA-507 Minor Project. Customers raise complaints, support agents resolve them, 
 | Backend: FastAPI + PostgreSQL + SQLAlchemy + Alembic | Done |
 | Authentication (bcrypt + JWT) and role-based access | Done |
 | Core ticket management (customer / agent / admin APIs) | Done |
-| Automated tests (pytest) | 53 passing (see [docs/test-cases.md](docs/test-cases.md)) |
+| Automated tests (pytest) | 74 passing (see [docs/test-cases.md](docs/test-cases.md)) |
 | Knowledge base: document upload, storage, list, delete | Done (Phase 1) — no AI yet |
+| Knowledge base: text extraction from PDF (pypdf) and UTF-8 text | Done (Phase 2) — no chunking or embeddings yet |
 | Frontend (HTML / CSS / JavaScript) | Done — customer, agent and admin interfaces, with a token-based design system ([docs/design-system.md](docs/design-system.md)) |
 | AI analysis and response assistance | Not started |
 | Knowledge base / RAG | Not started |

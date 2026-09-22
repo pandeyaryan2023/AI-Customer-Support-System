@@ -50,12 +50,20 @@ Authenticated endpoints need the header `Authorization: Bearer <token>`.
 | POST | `/admin/documents` | admin | Upload a document. `multipart/form-data` with `title` and `file` |
 | GET | `/admin/documents` | admin | List documents, newest first |
 | DELETE | `/admin/documents/{id}` | admin | Remove the document and its file (204) |
+| POST | `/admin/documents/{id}/extract` | admin | Extract (or re-extract) the text of a stored document |
+| GET | `/admin/documents/{id}/text` | admin | The extracted text (409 if the document has none) |
 
 Upload rules: `.pdf` or `.txt` only (415 otherwise); the bytes must match the extension —
 a PDF must start with `%PDF-`, text must be UTF-8 (415); not empty (400); at most
 `max_upload_mb`, default 10 MB (413); title 2–200 characters (422).
 The uploader's filename is kept for display only; the file is saved under a generated name.
 `DELETE` exists for documents only: an outdated policy must stop being used as a source.
+
+Text extraction runs straight after every upload. The upload succeeds even when extraction
+fails: the document keeps its file and gets `status` `FAILED` with the reason in
+`extraction_error` (damaged PDF, password-protected, no pages, no text layer such as a scan,
+not UTF-8, empty). `status` is `PENDING` (not extracted yet, e.g. uploaded before Phase 2),
+`EXTRACTED` or `FAILED`. Document lists never include the text itself; use `/text`.
 
 ## Status change rules
 

@@ -455,6 +455,10 @@ input[type="file"]::file-selector-button {
 .state-disabled { background: var(--slate-bg); color: var(--slate-fg); }
 .badge-neutral { background: var(--slate-bg); color: var(--slate-fg); }
 
+.doc-PENDING { background: var(--slate-bg); color: var(--slate-fg); }
+.doc-EXTRACTED { background: var(--green-bg); color: var(--green-fg); }
+.doc-FAILED { background: var(--red-bg); color: var(--red-fg); }
+
 .role-CUSTOMER { background: var(--slate-bg); color: var(--slate-fg); }
 .role-AGENT { background: var(--blue-bg); color: var(--blue-fg); }
 .role-ADMIN { background: var(--violet-bg); color: var(--violet-fg); }
@@ -527,6 +531,22 @@ tbody tr:hover { background: var(--surface-sunken); }
 tbody tr:hover .row-action,
 .row-action:focus-within { opacity: 1; }
 @media (hover: none) { .row-action { opacity: 1; } }
+
+/* Knowledge base: text status under the badge, and the extracted-text viewer. */
+.doc-summary { display: block; margin-top: var(--s1); max-width: 260px; white-space: normal; }
+.doc-actions { display: inline-flex; gap: var(--s2); }
+.doc-text {
+  margin: var(--s3) 0 0;
+  padding: var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--canvas);
+  font: inherit;
+  font-size: var(--fs-label);
+  line-height: var(--lh-body);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 
 /* ---------------------------------------------------------- segmented control */
 

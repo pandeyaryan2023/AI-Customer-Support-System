@@ -1,6 +1,6 @@
 # Test cases
 
-Automated tests: `cd backend; pytest`. Last run: **35 passed** (2026-09-20), using in-memory SQLite.
+Automated tests: `cd backend; pytest`. Last run: **74 passed** (2026-09-22), using in-memory SQLite.
 Not yet covered by pytest: PostgreSQL-specific behaviour, AI, AWS (none built yet).
 
 ## Browser walkthrough (scripted, Microsoft Edge)
@@ -100,6 +100,33 @@ The table below lists the original fourteen cases; all still pass.
 Browser check of the Knowledge base screen (Edge, 2026-09-22): empty state, upload of a PDF
 and a text file, fake PDF rejected by the server, `.exe` blocked in the browser before any
 request, delete, no overflow at 390 px — all passed, 0 console errors.
+
+## Text extraction (`tests/test_text_extraction.py`, 21 tests)
+
+| Case | Expected |
+|---|---|
+| Two-page PDF (extractor alone) | Both pages' text, separated by a blank line; `page_count` 2 |
+| UTF-8 text with BOM, `₹`, `–` and Windows line endings | Text intact, BOM removed, `
+` becomes `
+` |
+| Corrupted PDF, zero pages, blank page (scan), password-protected | `ExtractionError` with a matching reason |
+| Text file in Latin-1, in UTF-16, or only whitespace | `ExtractionError` with a matching reason |
+| Stored file missing | "The stored file is missing" |
+| NUL characters in extracted text | Removed (PostgreSQL cannot store them) |
+| Upload a valid PDF / text file | 201, `EXTRACTED`; `/text` returns the content; lists omit the text |
+| Upload a corrupted PDF, a scanned PDF, a blank text file | 201 but `FAILED` with the reason; original kept byte for byte; `/text` 409 |
+| The PDF library raises an unexpected error (`KeyError`) | 201, `FAILED`, "Unexpected error while reading the file"; no 500 |
+| Document stored before Phase 2 | Listed as `PENDING`; `POST /extract` makes it `EXTRACTED` |
+| Retry: file missing, then restored | `FAILED` (old text cleared), then `EXTRACTED` |
+| Customer or agent calls `/extract` or `/text`; no token | 403; 401 |
+| Unknown document | 404 |
+
+Manual check (Edge, against a scratch PostgreSQL database, 2026-09-22): 15 checks passed,
+0 console errors. `Customer_Support_Knowledge_Base_Test.pdf` extracted to 1 page, 512
+characters, including "Customers can request a refund within 30 days of purchase."
+A document stored before Phase 2 was extracted with the **Extract text** button; a damaged
+and a scanned PDF were kept as Failed with their reasons, and **Retry** failed cleanly again;
+a UTF-8 text file kept `₹` and `–`; no page overflow at 390 px.
 
 ## Manual tests still to do
 

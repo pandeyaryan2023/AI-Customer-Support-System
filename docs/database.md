@@ -1,7 +1,7 @@
 # Database design
 
 PostgreSQL, accessed through SQLAlchemy, created by Alembic migrations
-`0001_create_core_tables` and `0002_add_documents_table`.
+`0001_create_core_tables`, `0002_add_documents_table` and `0003_add_document_text_extraction`.
 
 ## Tables
 
@@ -12,7 +12,7 @@ PostgreSQL, accessed through SQLAlchemy, created by Alembic migrations
 | `categories` | Complaint categories managed by the admin | `id` PK, `name` (unique), `is_active` |
 | `tickets` | Customer complaints | `id` PK, `customer_id` FK -> users, `assigned_agent_id` FK -> agents (nullable), `category_id` FK -> categories (nullable), `status`, `priority` |
 | `ticket_messages` | Conversation on a ticket | `id` PK, `ticket_id` FK -> tickets, `sender_id` FK -> users, `message` |
-| `documents` | Knowledge-base files (the bytes are on disk, not in the database) | `id` PK, `title`, `original_filename` (display only), `stored_filename` (unique, generated), `content_type`, `size_bytes`, `uploaded_by_id` FK -> users |
+| `documents` | Knowledge-base files (the bytes are on disk, not in the database) | `id` PK, `title`, `original_filename` (display only), `stored_filename` (unique, generated), `content_type`, `size_bytes`, `uploaded_by_id` FK -> users, `status` (PENDING / EXTRACTED / FAILED), `extracted_text`, `page_count`, `char_count`, `extraction_error` |
 
 ## Relationships
 
@@ -27,11 +27,16 @@ Uploaded files are stored in `backend/storage/documents/` under a random name
 (`stored_filename`), never under the uploader's filename. That folder is outside
 `frontend/`, so it is not publicly served, and it is excluded from Git.
 
+The extracted text is stored in `documents.extracted_text` (PostgreSQL `text`). The model
+loads that column only when it is read (`deferred`), so listing documents stays fast.
+Migration 0003 gives existing rows `status = 'PENDING'`.
+
 ## Enumerated values (stored as text)
 
 - Ticket status: OPEN, IN_PROGRESS, WAITING_FOR_CUSTOMER, ESCALATED, RESOLVED, CLOSED
 - Priority: LOW, MEDIUM, HIGH, URGENT
 - Role: CUSTOMER, AGENT, ADMIN
+- Document status: PENDING, EXTRACTED, FAILED
 
 ## Indexes
 

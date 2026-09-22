@@ -343,6 +343,31 @@ function extensionOf(filename) {
   return dot === -1 ? "" : filename.slice(dot).toLowerCase();
 }
 
+const DOC_STATUS = { PENDING: "Not extracted", EXTRACTED: "Text ready", FAILED: "Failed" };
+
+function docStatusBadge(status) {
+  return h("span", { class: `badge doc-${status}` }, DOC_STATUS[status] || titleCase(status));
+}
+
+/** One line under the badge: how much text was found, or why there is none. */
+function textSummary(doc) {
+  if (doc.status === "FAILED") return doc.extraction_error;
+  if (doc.status !== "EXTRACTED") return "Text not extracted yet";
+  const chars = `${doc.char_count.toLocaleString()} characters`;
+  if (!doc.page_count) return chars;
+  return `${doc.page_count} ${doc.page_count === 1 ? "page" : "pages"} · ${chars}`;
+}
+
+function announceExtraction(doc, uploaded) {
+  if (doc.status === "EXTRACTED") {
+    const lead = uploaded ? `${doc.title} added.` : `${doc.title}:`;
+    toast(`${lead} ${doc.char_count.toLocaleString()} characters of text extracted.`, "success");
+  } else {
+    const lead = uploaded ? `${doc.title} was uploaded, but its` : `${doc.title}: the`;
+    toast(`${lead} text could not be extracted. ${doc.extraction_error}.`, "info");
+  }
+}
+
 function renderDocuments() {
   const addButton = h("button", { class: "btn", type: "button", onclick: () => openDocumentSheet(load) },
     icon("upload"), "Upload document");
@@ -370,6 +395,21 @@ function renderDocuments() {
           });
         });
 
+        // Extracted: read the text. Not extracted or failed: run extraction (again).
+        let textAction;
+        if (doc.status === "EXTRACTED") {
+          textAction = h("button", { class: "btn btn-sm btn-secondary", type: "button",
+            onclick: () => openTextSheet(doc) }, "View text");
+        } else {
+          textAction = h("button", { class: "btn btn-sm btn-secondary", type: "button" },
+            doc.status === "FAILED" ? "Retry" : "Extract text");
+          textAction.addEventListener("click", () => guarded(textAction, async () => {
+            const result = await api(`/admin/documents/${doc.id}/extract`, { method: "POST" });
+            announceExtraction(result, false);
+            await load();
+          }));
+        }
+
         return h("tr", {},
           h("td", { class: "cell-subject" },
             h("span", { class: "strong", style: "display:block" }, doc.title),
@@ -377,13 +417,15 @@ function renderDocuments() {
           h("td", {}, h("span", { class: "badge badge-plain badge-neutral" },
             UPLOAD_TYPES[extensionOf(doc.original_filename)] || doc.content_type)),
           h("td", { class: "col-num" }, formatBytes(doc.size_bytes)),
+          h("td", {}, docStatusBadge(doc.status),
+            h("span", { class: "meta doc-summary" }, textSummary(doc))),
           h("td", {}, identity(doc.uploaded_by.full_name)),
           h("td", { class: "meta" }, fmtDay(doc.created_at)),
-          h("td", { class: "col-actions" }, h("span", { class: "row-action" }, remove)));
+          h("td", { class: "col-actions" }, h("span", { class: "row-action doc-actions" }, textAction, remove)));
       });
 
       return tableOrEmpty(rows,
-        ["Document", "Type", "Size", "Uploaded by", "Added", { label: "", align: "right" }],
+        ["Document", "Type", "Size", "Text", "Uploaded by", "Added", { label: "", align: "right" }],
         emptyState({
           icon: "file",
           title: "No documents yet",
@@ -426,7 +468,7 @@ function openDocumentSheet(onDone) {
     guarded(submit, async () => {
       const doc = await api("/admin/documents", { method: "POST", upload: body });
       closeSheet();
-      toast(`${doc.title} added to the knowledge base.`, "success");
+      announceExtraction(doc, true);
       onDone();
     });
   });
@@ -435,5 +477,21 @@ function openDocumentSheet(onDone) {
     title: "Upload a document",
     body: form,
     footer: [h("button", { class: "btn btn-secondary", type: "button", onclick: closeSheet }, "Cancel"), submit],
+  });
+}
+
+/** The extracted text, exactly as later phases will read it. Fetched only when opened. */
+function openTextSheet(doc) {
+  const content = h("div", {});
+  openSheet({
+    title: doc.title,
+    body: h("div", {},
+      h("p", { class: "meta" }, `${textSummary(doc)} · from ${doc.original_filename}`),
+      content),
+    footer: [h("button", { class: "btn btn-secondary", type: "button", onclick: closeSheet }, "Close")],
+  });
+  loadInto(content, skeletonRows(6), async () => {
+    const result = await api(`/admin/documents/${doc.id}/text`);
+    return h("pre", { class: "doc-text" }, result.extracted_text);
   });
 }
