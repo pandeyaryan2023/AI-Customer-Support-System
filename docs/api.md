@@ -52,6 +52,8 @@ Authenticated endpoints need the header `Authorization: Bearer <token>`.
 | DELETE | `/admin/documents/{id}` | admin | Remove the document and its file (204) |
 | POST | `/admin/documents/{id}/extract` | admin | Extract (or re-extract) the text of a stored document |
 | GET | `/admin/documents/{id}/text` | admin | The extracted text (409 if the document has none) |
+| POST | `/admin/documents/{id}/index` | admin | Chunk and embed again, replacing old chunks (409 if no text) |
+| GET | `/admin/documents/{id}/chunks` | admin | Stored chunks in order, with each vector's length and first 8 numbers |
 
 Upload rules: `.pdf` or `.txt` only (415 otherwise); the bytes must match the extension —
 a PDF must start with `%PDF-`, text must be UTF-8 (415); not empty (400); at most
@@ -64,6 +66,14 @@ fails: the document keeps its file and gets `status` `FAILED` with the reason in
 `extraction_error` (damaged PDF, password-protected, no pages, no text layer such as a scan,
 not UTF-8, empty). `status` is `PENDING` (not extracted yet, e.g. uploaded before Phase 2),
 `EXTRACTED` or `FAILED`. Document lists never include the text itself; use `/text`.
+
+After extraction the text is cleaned, split into chunks of whole sentences (up to
+`chunk_words` = 500 words, neighbours sharing up to `chunk_overlap_words` = 75 words) and
+embedded by the local Ollama model `nomic-embed-text` (768 numbers per chunk).
+`index_status` is `NOT_INDEXED`, `INDEXED` or `FAILED` (reason in `index_error`, e.g. Ollama
+not running, model not installed, invalid reply). A document has chunks only when it is
+`INDEXED`; re-indexing replaces its chunks in one transaction, so they are never duplicated.
+A failed indexing never fails the upload, and never touches the file or the extracted text.
 
 ## Status change rules
 

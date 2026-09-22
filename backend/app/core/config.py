@@ -23,6 +23,16 @@ class Settings(BaseSettings):
     storage_dir: Path = BACKEND_DIR / "storage" / "documents"
     max_upload_mb: int = 10
 
+    # Chunking: words per chunk, and roughly how many words neighbouring chunks share.
+    chunk_words: int = 500
+    chunk_overlap_words: int = 75
+
+    # Local embeddings through Ollama. Runs on this machine; no paid API is involved.
+    ollama_url: str = "http://127.0.0.1:11434"
+    embedding_model: str = "nomic-embed-text"
+    embedding_dimension: int = 768  # how many numbers nomic-embed-text returns per text
+    ollama_timeout_seconds: float = 120  # the first call also loads the model into memory
+
     model_config = SettingsConfigDict(env_file=ENV_FILE, env_file_encoding="utf-8")
 
     @property

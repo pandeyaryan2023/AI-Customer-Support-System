@@ -343,10 +343,31 @@ function extensionOf(filename) {
   return dot === -1 ? "" : filename.slice(dot).toLowerCase();
 }
 
-const DOC_STATUS = { PENDING: "Not extracted", EXTRACTED: "Text ready", FAILED: "Failed" };
+/**
+ * A document goes through two steps: text extraction, then indexing (chunks + embeddings).
+ * One badge shows how far it got, and the line under it says what was found or what failed.
+ */
+function docState(doc) {
+  if (doc.status === "PENDING") return { key: "PENDING", label: "Not extracted", note: "Text not extracted yet" };
+  if (doc.status === "FAILED") return { key: "FAILED", label: "Failed", note: doc.extraction_error };
+  if (doc.index_status === "INDEXED") {
+    return { key: "INDEXED", label: "Indexed", note: `${textSummary(doc)} · ${plural(doc.chunk_count, "chunk")}` };
+  }
+  if (doc.index_status === "FAILED") return { key: "INDEX_FAILED", label: "Not indexed", note: doc.index_error };
+  return { key: "EXTRACTED", label: "Text ready", note: `${textSummary(doc)} · not indexed yet` };
+}
 
-function docStatusBadge(status) {
-  return h("span", { class: `badge doc-${status}` }, DOC_STATUS[status] || titleCase(status));
+function docStatusBadge(state) {
+  return h("span", { class: `badge doc-${state.key}` }, state.label);
+}
+
+function plural(count, word) {
+  return `${count} ${word}${count === 1 ? "" : "s"}`;
+}
+
+/** Server messages may or may not end with punctuation; a toast sentence should, once. */
+function sentence(text) {
+  return /[.!?]$/.test(text) ? text : `${text}.`;
 }
 
 /** One line under the badge: how much text was found, or why there is none. */
@@ -358,13 +379,16 @@ function textSummary(doc) {
   return `${doc.page_count} ${doc.page_count === 1 ? "page" : "pages"} · ${chars}`;
 }
 
-function announceExtraction(doc, uploaded) {
-  if (doc.status === "EXTRACTED") {
-    const lead = uploaded ? `${doc.title} added.` : `${doc.title}:`;
-    toast(`${lead} ${doc.char_count.toLocaleString()} characters of text extracted.`, "success");
+function announceProcessing(doc, uploaded) {
+  const lead = uploaded ? `${doc.title} added.` : `${doc.title}:`;
+  if (doc.status !== "EXTRACTED") {
+    const failLead = uploaded ? `${doc.title} was uploaded, but its` : `${doc.title}: the`;
+    toast(`${failLead} text could not be extracted. ${sentence(doc.extraction_error)}`, "info");
+  } else if (doc.index_status === "INDEXED") {
+    toast(`${lead} ${doc.char_count.toLocaleString()} characters extracted, ` +
+      `${plural(doc.chunk_count, "chunk")} indexed.`, "success");
   } else {
-    const lead = uploaded ? `${doc.title} was uploaded, but its` : `${doc.title}: the`;
-    toast(`${lead} text could not be extracted. ${doc.extraction_error}.`, "info");
+    toast(`${lead} Text extracted, but indexing failed. ${sentence(doc.index_error)}`, "info");
   }
 }
 
@@ -395,20 +419,29 @@ function renderDocuments() {
           });
         });
 
-        // Extracted: read the text. Not extracted or failed: run extraction (again).
-        let textAction;
-        if (doc.status === "EXTRACTED") {
-          textAction = h("button", { class: "btn btn-sm btn-secondary", type: "button",
-            onclick: () => openTextSheet(doc) }, "View text");
-        } else {
-          textAction = h("button", { class: "btn btn-sm btn-secondary", type: "button" },
-            doc.status === "FAILED" ? "Retry" : "Extract text");
-          textAction.addEventListener("click", () => guarded(textAction, async () => {
-            const result = await api(`/admin/documents/${doc.id}/extract`, { method: "POST" });
-            announceExtraction(result, false);
+        // A button that runs a processing step on the server, then reloads the table.
+        const stepButton = (label, path) => {
+          const button = h("button", { class: "btn btn-sm btn-secondary", type: "button" }, label);
+          button.addEventListener("click", () => guarded(button, async () => {
+            const result = await api(`/admin/documents/${doc.id}/${path}`, { method: "POST" });
+            announceProcessing(result, false);
             await load();
           }));
+          return button;
+        };
+
+        // Extracted: view it, and (re)index it if indexing is not done. Otherwise: extract (again).
+        const actions = [];
+        if (doc.status === "EXTRACTED") {
+          actions.push(h("button", { class: "btn btn-sm btn-secondary", type: "button",
+            onclick: () => openDocumentViewer(doc) }, "View"));
+          if (doc.index_status !== "INDEXED") {
+            actions.push(stepButton(doc.index_status === "FAILED" ? "Retry indexing" : "Index", "index"));
+          }
+        } else {
+          actions.push(stepButton(doc.status === "FAILED" ? "Retry" : "Extract text", "extract"));
         }
+        const state = docState(doc);
 
         return h("tr", {},
           h("td", { class: "cell-subject" },
@@ -417,15 +450,15 @@ function renderDocuments() {
           h("td", {}, h("span", { class: "badge badge-plain badge-neutral" },
             UPLOAD_TYPES[extensionOf(doc.original_filename)] || doc.content_type)),
           h("td", { class: "col-num" }, formatBytes(doc.size_bytes)),
-          h("td", {}, docStatusBadge(doc.status),
-            h("span", { class: "meta doc-summary" }, textSummary(doc))),
+          h("td", {}, docStatusBadge(state),
+            h("span", { class: "meta doc-summary" }, state.note)),
           h("td", {}, identity(doc.uploaded_by.full_name)),
           h("td", { class: "meta" }, fmtDay(doc.created_at)),
-          h("td", { class: "col-actions" }, h("span", { class: "row-action doc-actions" }, textAction, remove)));
+          h("td", { class: "col-actions" }, h("span", { class: "row-action doc-actions" }, ...actions, remove)));
       });
 
       return tableOrEmpty(rows,
-        ["Document", "Type", "Size", "Text", "Uploaded by", "Added", { label: "", align: "right" }],
+        ["Document", "Type", "Size", "Status", "Uploaded by", "Added", { label: "", align: "right" }],
         emptyState({
           icon: "file",
           title: "No documents yet",
@@ -468,7 +501,7 @@ function openDocumentSheet(onDone) {
     guarded(submit, async () => {
       const doc = await api("/admin/documents", { method: "POST", upload: body });
       closeSheet();
-      announceExtraction(doc, true);
+      announceProcessing(doc, true);
       onDone();
     });
   });
@@ -480,18 +513,47 @@ function openDocumentSheet(onDone) {
   });
 }
 
-/** The extracted text, exactly as later phases will read it. Fetched only when opened. */
-function openTextSheet(doc) {
+/** The extracted text, and the chunks made from it. Each is fetched only when shown. */
+function openDocumentViewer(doc) {
+  const tabs = h("div", {});
   const content = h("div", {});
+
+  async function loadText() {
+    const result = await api(`/admin/documents/${doc.id}/text`);
+    return h("pre", { class: "doc-text" }, result.extracted_text);
+  }
+
+  async function loadChunks() {
+    const chunks = await api(`/admin/documents/${doc.id}/chunks`);
+    if (!chunks.length) {
+      return emptyState({ icon: "file", title: "No chunks",
+        text: doc.index_error || "This document has not been indexed yet." });
+    }
+    return h("div", { class: "chunk-list" }, chunks.map((chunk) =>
+      h("article", { class: "chunk" },
+        h("p", { class: "chunk-head" },
+          `Chunk ${chunk.chunk_index} · ${chunk.word_count} words · ` +
+          `${chunk.embedding_dimension} numbers from ${chunk.embedding_model}`),
+        h("pre", { class: "doc-text" }, chunk.text),
+        // Only the first few numbers of the vector, to show it exists and looks sane.
+        h("p", { class: "meta chunk-vector" },
+          `[${chunk.embedding_preview.map((x) => x.toFixed(4)).join(", ")}, …]`))));
+  }
+
+  function show(tab) {
+    tabs.replaceChildren(segmented(
+      [{ id: "text", label: "Text" }, { id: "chunks", label: "Chunks", count: doc.chunk_count || 0 }],
+      tab, show));
+    loadInto(content, skeletonRows(6), tab === "text" ? loadText : loadChunks);
+  }
+
   openSheet({
     title: doc.title,
     body: h("div", {},
-      h("p", { class: "meta" }, `${textSummary(doc)} · from ${doc.original_filename}`),
+      h("p", { class: "meta" }, `${docState(doc).note} · from ${doc.original_filename}`),
+      tabs,
       content),
     footer: [h("button", { class: "btn btn-secondary", type: "button", onclick: closeSheet }, "Close")],
   });
-  loadInto(content, skeletonRows(6), async () => {
-    const result = await api(`/admin/documents/${doc.id}/text`);
-    return h("pre", { class: "doc-text" }, result.extracted_text);
-  });
+  show("text");
 }

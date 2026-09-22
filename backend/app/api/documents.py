@@ -5,8 +5,8 @@ from pydantic import StringConstraints
 
 from app.api.deps import DbSession, require_roles
 from app.models import Role, User
-from app.schemas.document import DocumentOut, DocumentTextOut
-from app.services import document_service
+from app.schemas.document import ChunkOut, DocumentOut, DocumentTextOut
+from app.services import document_service, indexing_service
 
 # The knowledge base is managed by admins only, like everything else under /admin.
 router = APIRouter(
@@ -28,10 +28,12 @@ def upload_document(
 ):
     """Upload a document. Sent as multipart/form-data with two parts: `title` and `file`.
 
-    Its text is extracted straight away. If that fails the upload still succeeds:
-    the document is kept with status FAILED and the reason in `extraction_error`.
+    Its text is extracted straight away, then chunked and embedded. If either step fails
+    the upload still succeeds: the document is kept, and `status` / `index_status` say
+    FAILED with the reason in `extraction_error` / `index_error`.
     """
-    return document_service.save_document(db, admin, title, file)
+    document = document_service.save_document(db, admin, title, file)  # stored + extracted
+    return indexing_service.refresh_index(db, document)                # chunked + embedded
 
 
 @router.get("", response_model=list[DocumentOut])
@@ -44,15 +46,32 @@ def extract_document(document_id: int, db: DbSession):
     """Extract (or re-extract) the text of a stored document.
 
     Used for documents uploaded before text extraction existed, and to retry a failure.
+    The chunks are then rebuilt from the new text.
     """
     document = document_service.get_document(db, document_id)
-    return document_service.extract_document(db, document)
+    document = document_service.extract_document(db, document)
+    return indexing_service.refresh_index(db, document)
 
 
 @router.get("/{document_id}/text", response_model=DocumentTextOut)
 def get_document_text(document_id: int, db: DbSession):
     """The extracted text of one document. 409 if it has none (PENDING or FAILED)."""
     return document_service.get_text(db, document_id)
+
+
+@router.post("/{document_id}/index", response_model=DocumentOut)
+def index_document(document_id: int, db: DbSession):
+    """Chunk and embed the extracted text again, replacing any previous chunks.
+
+    Used to retry after Ollama was unavailable. 409 if the text is not extracted.
+    """
+    return indexing_service.reindex(db, document_id)
+
+
+@router.get("/{document_id}/chunks", response_model=list[ChunkOut])
+def list_document_chunks(document_id: int, db: DbSession):
+    """The stored chunks, in order, with each embedding's length and first numbers."""
+    return indexing_service.list_chunks(db, document_id)
 
 
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)

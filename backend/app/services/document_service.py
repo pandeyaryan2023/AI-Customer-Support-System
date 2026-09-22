@@ -4,11 +4,11 @@ import uuid
 from pathlib import Path
 
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models import Document, DocumentStatus, User
+from app.models import Document, DocumentChunk, DocumentStatus, User
 from app.services import text_extraction
 from app.services.text_extraction import ExtractionError
 
@@ -171,6 +171,7 @@ def list_documents(db: Session) -> list[Document]:
 def delete_document(db: Session, document_id: int) -> None:
     document = get_document(db, document_id)
     path = storage_path(document)
+    db.execute(delete(DocumentChunk).where(DocumentChunk.document_id == document.id))
     db.delete(document)
     db.commit()
     # Remove the file only after the row is gone. If this step failed we'd be left

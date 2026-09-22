@@ -1,16 +1,21 @@
 import os
+import random
 from types import SimpleNamespace
 
 # Set BEFORE the app is imported, so tests can never touch the real PostgreSQL database.
 os.environ["DATABASE_URL"] = "sqlite://"
 os.environ["JWT_SECRET_KEY"] = "test-secret-key-only-for-automated-tests"
+# A closed port: even if a call slipped past the fake below, it could not reach a real Ollama.
+os.environ["OLLAMA_URL"] = "http://127.0.0.1:9"
 
+import httpx  # noqa: E402
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import create_engine  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
+from app.core.config import settings  # noqa: E402
 from app.core.security import hash_password  # noqa: E402
 from app.database.base import Base  # noqa: E402
 from app.database.session import get_db  # noqa: E402
@@ -18,6 +23,36 @@ from app.main import app  # noqa: E402
 from app.models import Agent, Category, Role, User  # noqa: E402
 
 PASSWORD = "password123"
+
+
+class FakeOllama:
+    """Stands in for the local Ollama server, so no test needs Ollama running.
+
+    Answers POST /api/embed like the real one: one vector of embedding_dimension numbers
+    per input. The numbers are derived from the text, so the same text always gets the
+    same vector, and different texts get different vectors.
+    """
+
+    def __init__(self):
+        self.requests = []  # every JSON body "sent to Ollama", for tests to inspect
+
+    @staticmethod
+    def vector(text: str) -> list[float]:
+        rng = random.Random(text)
+        return [rng.uniform(-1, 1) for _ in range(settings.embedding_dimension)]
+
+    def post(self, url, json, timeout):
+        self.requests.append(json)
+        body = {"model": json["model"], "embeddings": [self.vector(text) for text in json["input"]]}
+        return httpx.Response(200, json=body, request=httpx.Request("POST", url))
+
+
+@pytest.fixture(autouse=True)
+def fake_ollama(monkeypatch):
+    """Every test talks to the fake. A test can replace httpx.post again to simulate failures."""
+    server = FakeOllama()
+    monkeypatch.setattr(httpx, "post", server.post)
+    return server
 
 
 @pytest.fixture()

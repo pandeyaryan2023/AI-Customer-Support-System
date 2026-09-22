@@ -1,6 +1,7 @@
 # Test cases
 
-Automated tests: `cd backend; pytest`. Last run: **74 passed** (2026-09-22), using in-memory SQLite.
+Automated tests: `cd backend; pytest`. Last run: **139 passed** (2026-09-22), using in-memory SQLite
+and a fake Ollama (`tests/conftest.py`), so no test needs Ollama running.
 Not yet covered by pytest: PostgreSQL-specific behaviour, AI, AWS (none built yet).
 
 ## Browser walkthrough (scripted, Microsoft Edge)
@@ -127,6 +128,57 @@ characters, including "Customers can request a refund within 30 days of purchase
 A document stored before Phase 2 was extracted with the **Extract text** button; a damaged
 and a scanned PDF were kept as Failed with their reasons, and **Retry** failed cleanly again;
 a UTF-8 text file kept `₹` and `–`; no page overflow at 390 px.
+
+## Cleaning and chunking (`tests/test_chunking.py`, 25 tests)
+
+| Case | Expected |
+|---|---|
+| Ligatures, non-breaking spaces, soft hyphens, zero-width characters, NUL, control characters | Removed or normalised |
+| Tabs, repeated spaces, 4+ blank lines, Windows line endings | Tidied |
+| Punctuation, `₹`, `–`, Hindi, German, Chinese, curly quotes | Unchanged; cleaning twice = cleaning once |
+| Normal text / short text / 1,200 words at 500/75 | Whole sentences per chunk / 1 chunk / 3 chunks, nothing lost |
+| Overlap 20 words, overlap 0 | Next chunk repeats the last two sentences / shares nothing |
+| One 30-word "sentence" with no punctuation at 10/3 | Split by words, exactly 3 words shared |
+| Line break inside a sentence | Sentence kept whole |
+| The test PDF's text | 1 chunk at 500 words; at 30 words, 3 chunks starting at its 3 headings |
+| Empty or whitespace-only text | No chunks |
+| Indexes, order, word counts, same input twice, invalid sizes | 0..n-1 in reading order, exact counts, identical, ValueError |
+
+## Embedding client (`tests/test_embedding_client.py`, 18 tests)
+
+| Case | Expected |
+|---|---|
+| Two texts; request body; 20 texts | Two vectors in order; model, `search_document: ` prefix, `truncate: false`; batches of 16 and 4 |
+| Ollama not running; timeout; model not installed (404); other error (400) | `EmbeddingError` with a readable reason |
+| Not JSON, missing key, wrong shape, wrong count, empty or null vector, 384 numbers | `EmbeddingError`; nothing returned |
+| A string, boolean, NaN or null inside the vector | `EmbeddingError` |
+
+## Indexing pipeline (`tests/test_indexing.py`, 22 tests)
+
+| Case | Expected |
+|---|---|
+| Upload text / PDF | `INDEXED`, 1 chunk; `/chunks` shows 768 numbers, a preview, never the full vector |
+| Stored vector | Exactly the numbers Ollama returned |
+| Long document at 20/5 words | Several chunks, indexes 0..n-1, sent to Ollama in the same order |
+| Re-index twice; re-index at a new chunk size | Still one chunk 0; exactly the new set, old chunk gone |
+| Re-index one document | Other documents' chunks untouched |
+| Re-extraction fails, then succeeds | Chunks removed (`NOT_INDEXED`), then rebuilt |
+| Ollama unavailable at upload | 201, text kept and viewable, `FAILED` with reason, no chunks |
+| Ollama back, retry | `INDEXED` |
+| Re-index fails after a success | Old chunks removed: chunks exist only when `INDEXED` |
+| Malformed, empty or wrong-dimension embeddings | `FAILED`, nothing saved |
+| Unexpected error while chunking | `FAILED`, "Unexpected error while indexing"; no 500 |
+| Extraction failed; text only invisible characters | Not indexed, Ollama never called; `/index` 409 / `FAILED` |
+| Delete document | Its chunks deleted |
+| Database fails at commit | Rolled back: the previous chunk and status unchanged, even in the same session |
+| Customer or agent calls `/index`, `/chunks`; no token; unknown id | 403; 401; 404 |
+
+Manual check (2026-09-22, scratch PostgreSQL database, real Ollama `nomic-embed-text`, Edge):
+`Customer_Support_Knowledge_Base_Test.pdf` gave 1 chunk (81 words) with a 768-number JSONB
+vector identical to a fresh Ollama call; three re-runs left exactly 1 chunk row; at 30/15
+words it gave 5 sequential chunks; an unreachable Ollama gave `FAILED` with no chunks and
+**Retry indexing** in the browser fixed it. 12/12 API/database checks and 9/9 browser checks
+passed, 0 console errors, no overflow at 390 px.
 
 ## Manual tests still to do
 

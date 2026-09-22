@@ -1,11 +1,12 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String, Text
+from sqlalchemy import JSON, DateTime, Enum, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base, utcnow
-from app.models.enums import DocumentStatus
+from app.models.enums import DocumentStatus, IndexStatus
 from app.models.user import User
 
 
@@ -38,4 +39,33 @@ class Document(Base):
     char_count: Mapped[Optional[int]]
     extraction_error: Mapped[Optional[str]] = mapped_column(String(300))
 
+    # Chunking and embeddings (Phase 3).
+    index_status: Mapped[IndexStatus] = mapped_column(
+        Enum(IndexStatus, native_enum=False, length=20),
+        default=IndexStatus.NOT_INDEXED,
+        server_default=IndexStatus.NOT_INDEXED.value,
+    )
+    index_error: Mapped[Optional[str]] = mapped_column(String(300))
+    chunk_count: Mapped[Optional[int]]
+
     uploaded_by: Mapped[User] = relationship()
+
+
+class DocumentChunk(Base):
+    """One piece of a document's text, with the embedding vector that describes its meaning."""
+
+    __tablename__ = "document_chunks"
+    # No document can have two "chunk 0"s: the database itself refuses duplicates.
+    # The same constraint also indexes document_id, which every chunk query filters on.
+    __table_args__ = (UniqueConstraint("document_id", "chunk_index"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"))
+    chunk_index: Mapped[int]  # 0, 1, 2 ... in reading order
+    text: Mapped[str] = mapped_column(Text)
+    word_count: Mapped[int]
+    # The vector: a JSON list of numbers (JSONB in PostgreSQL, plain JSON in the tests' SQLite).
+    embedding: Mapped[list[float]] = mapped_column(JSON().with_variant(JSONB(), "postgresql"))
+    # Vectors from different models cannot be compared, so record which model made this one.
+    embedding_model: Mapped[str] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

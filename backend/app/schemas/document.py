@@ -1,9 +1,9 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
-from app.models import DocumentStatus
+from app.models import DocumentStatus, IndexStatus
 from app.schemas.user import UserBrief
 
 
@@ -27,6 +27,32 @@ class DocumentOut(BaseModel):
     page_count: Optional[int]
     char_count: Optional[int]
     extraction_error: Optional[str]
+    index_status: IndexStatus
+    chunk_count: Optional[int]
+    index_error: Optional[str]
+
+
+class ChunkOut(BaseModel):
+    """One chunk, for checking what was stored. The full vector is not sent: only its
+    length and its first few numbers, which is enough to see that it exists and is sane."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    chunk_index: int
+    text: str
+    word_count: int
+    embedding_model: str
+    embedding: list[float] = Field(exclude=True)
+
+    @computed_field
+    @property
+    def embedding_dimension(self) -> int:
+        return len(self.embedding)
+
+    @computed_field
+    @property
+    def embedding_preview(self) -> list[float]:
+        return self.embedding[:8]
 
 
 class DocumentTextOut(BaseModel):

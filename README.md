@@ -10,9 +10,10 @@ BCA-507 Minor Project. Customers raise complaints, support agents resolve them, 
 | Backend: FastAPI + PostgreSQL + SQLAlchemy + Alembic | Done |
 | Authentication (bcrypt + JWT) and role-based access | Done |
 | Core ticket management (customer / agent / admin APIs) | Done |
-| Automated tests (pytest) | 74 passing (see [docs/test-cases.md](docs/test-cases.md)) |
+| Automated tests (pytest) | 139 passing (see [docs/test-cases.md](docs/test-cases.md)) |
 | Knowledge base: document upload, storage, list, delete | Done (Phase 1) — no AI yet |
-| Knowledge base: text extraction from PDF (pypdf) and UTF-8 text | Done (Phase 2) — no chunking or embeddings yet |
+| Knowledge base: text extraction from PDF (pypdf) and UTF-8 text | Done (Phase 2) |
+| Knowledge base: text cleaning, chunking, local embeddings (Ollama `nomic-embed-text`) | Done (Phase 3) — no search yet |
 | Frontend (HTML / CSS / JavaScript) | Done — customer, agent and admin interfaces, with a token-based design system ([docs/design-system.md](docs/design-system.md)) |
 | AI analysis and response assistance | Not started |
 | Knowledge base / RAG | Not started |
@@ -46,7 +47,12 @@ cd backend
 .\.venv\Scripts\activate
 pytest
 ```
-Tests use an in-memory SQLite database, so they never touch your PostgreSQL data.
+Tests use an in-memory SQLite database, so they never touch your PostgreSQL data,
+and a fake Ollama, so they never need Ollama running.
+
+Embeddings need Ollama with the embedding model: `ollama pull nomic-embed-text` (once).
+If Ollama is not running, uploads still work; the document shows *Not indexed* and can be
+retried from the Knowledge base screen.
 
 ## Folders
 

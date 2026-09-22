@@ -456,8 +456,10 @@ input[type="file"]::file-selector-button {
 .badge-neutral { background: var(--slate-bg); color: var(--slate-fg); }
 
 .doc-PENDING { background: var(--slate-bg); color: var(--slate-fg); }
-.doc-EXTRACTED { background: var(--green-bg); color: var(--green-fg); }
-.doc-FAILED { background: var(--red-bg); color: var(--red-fg); }
+.doc-EXTRACTED { background: var(--amber-bg); color: var(--amber-fg); }  /* text ready, not indexed */
+.doc-INDEXED { background: var(--green-bg); color: var(--green-fg); }
+.doc-FAILED,
+.doc-INDEX_FAILED { background: var(--red-bg); color: var(--red-fg); }
 
 .role-CUSTOMER { background: var(--slate-bg); color: var(--slate-fg); }
 .role-AGENT { background: var(--blue-bg); color: var(--blue-fg); }
@@ -547,6 +549,11 @@ tbody tr:hover .row-action,
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.sheet .segmented { margin-top: var(--s3); }
+.chunk-list { display: grid; gap: var(--s4); margin-top: var(--s3); }
+.chunk-head { font-size: var(--fs-label); font-weight: var(--fw-semibold); }
+.chunk .doc-text { margin-top: var(--s2); }
+.chunk-vector { margin-top: var(--s2); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 
 /* ---------------------------------------------------------- segmented control */
 
