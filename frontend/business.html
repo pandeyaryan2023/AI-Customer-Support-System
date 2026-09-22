@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Create a business · Support Desk</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div class="auth">
+    <main class="auth-form-side">
+      <div class="auth-form">
+        <div class="auth-brand">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 14v-2a8 8 0 0 1 16 0v2M4 14a2 2 0 0 1 2-2h1v6H6a2 2 0 0 1-2-2zM20 14a2 2 0 0 0-2-2h-1v6h1a2 2 0 0 0 2-2zM17 18v1a3 3 0 0 1-3 3h-2"/>
+            </svg>
+          </span>
+          <span>
+            <span class="brand-name">Support Desk</span>
+            <span class="brand-sub">Complaint management</span>
+          </span>
+        </div>
+
+        <h1 class="auth-title">Set up support for your business</h1>
+        <p class="auth-sub">Create your business and its first admin account. You can then add agents, categories and help articles. Customers join with your own sign-up link.</p>
+
+        <form id="business-form" novalidate>
+          <div class="auth-fields">
+            <div class="field">
+              <label for="business-name">Business name</label>
+              <input id="business-name" type="text" minlength="2" maxlength="120" placeholder="Acme Store" required>
+            </div>
+            <div class="field">
+              <label for="business-slug">Business code</label>
+              <input id="business-slug" type="text" autocomplete="off" minlength="3" maxlength="50"
+                     placeholder="acme-store" required>
+              <p class="field-hint">Used in your customers' sign-up link. Lowercase letters, numbers and hyphens.</p>
+            </div>
+            <div class="field">
+              <label for="full-name">Your name</label>
+              <input id="full-name" type="text" autocomplete="name" minlength="2" maxlength="100"
+                     placeholder="Asha Rao" required>
+            </div>
+            <div class="field">
+              <label for="email">Your email</label>
+              <input id="email" type="email" autocomplete="username" placeholder="you@company.com" required>
+            </div>
+            <div class="field">
+              <label for="password">Password</label>
+              <input id="password" type="password" autocomplete="new-password" minlength="8" required>
+              <p class="field-hint">At least 8 characters.</p>
+            </div>
+            <div class="field" id="confirm-field">
+              <label for="confirm">Confirm password</label>
+              <input id="confirm" type="password" autocomplete="new-password" required>
+              <p class="field-error hidden" id="confirm-error">Both passwords must match.</p>
+            </div>
+          </div>
+          <button class="btn btn-block auth-submit" type="submit">Create business</button>
+        </form>
+
+        <p class="auth-alt">Already set up? <a href="login.html">Log in</a></p>
+      </div>
+    </main>
+
+    <aside class="auth-panel on-ink" aria-label="About Support Desk">
+      <h2 class="auth-panel-title">Support that keeps its promises.</h2>
+      <p class="auth-panel-text">
+        Raise a complaint once. Follow it from open to closed, with every reply and
+        status change recorded on the same ticket.
+      </p>
+      <ul class="auth-points">
+        <li class="auth-point">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          <span>Your complaints stay private to you and the support team</span>
+        </li>
+        <li class="auth-point">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          <span>See the current status without asking anyone</span>
+        </li>
+        <li class="auth-point">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          <span>Reply directly to the agent handling your case</span>
+        </li>
+      </ul>
+    </aside>
+  </div>
+
+  <script src="js/ui.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/business.js"></script>
+</body>
+</html>

@@ -42,7 +42,8 @@ def add_document(session_factory, admin):
         with session_factory() as db:
             document = Document(title=title, original_filename=f"{title}.txt",
                                 stored_filename=f"{uuid.uuid4().hex}.txt", content_type="text/plain",
-                                size_bytes=100, uploaded_by_id=admin.id, status=DocumentStatus.EXTRACTED,
+                                size_bytes=100, uploaded_by_id=admin.id, business_id=admin.business_id,
+                                status=DocumentStatus.EXTRACTED,
                                 index_status=index_status, chunk_count=len(chunks))
             db.add(document)
             db.flush()
@@ -313,7 +314,8 @@ def test_who_can_ask(client, admin, customer, make_user, knowledge_base, ollama)
 # ---------------------------------------------------------- the recorded reason (for logs and Phase 6)
 
 @pytest.mark.parametrize("seed, reason", [(False, "NO_INDEXED_DOCUMENTS"), (True, "NO_MATCH")])
-def test_reason_says_why_there_is_no_answer(session_factory, knowledge_base, add_document, ollama, seed, reason):
+def test_reason_says_why_there_is_no_answer(session_factory, knowledge_base, add_document, ollama, seed, reason,
+                                            default_business):
     from app.services.rag_service import answer_question
     from app.services.search_service import SearchScope
 
@@ -323,6 +325,6 @@ def test_reason_says_why_there_is_no_answer(session_factory, knowledge_base, add
             db.query(DocumentChunk).delete()
             db.query(Document).delete()
             db.commit()
-        result = answer_question(db, "What is the capital of France?", SearchScope())
+        result = answer_question(db, "What is the capital of France?", SearchScope(default_business.id))
     assert (result.status, result.reason, result.model) == ("NOT_ENOUGH_INFORMATION", reason, None)
     assert fake.chats == []

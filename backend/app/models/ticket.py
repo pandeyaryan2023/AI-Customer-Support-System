@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import JSON, DateTime, Enum, ForeignKey, String, Text
+from sqlalchemy import JSON, DateTime, Enum, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -14,9 +14,12 @@ class Category(Base):
     """A complaint category such as Billing, Delivery or Technical Issue."""
 
     __tablename__ = "categories"
+    # Names are unique within a business: two businesses can both have "Billing".
+    __table_args__ = (UniqueConstraint("business_id", "name", name="uq_categories_business_name"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(100), unique=True)
+    business_id: Mapped[int] = mapped_column(ForeignKey("businesses.id"))
+    name: Mapped[str] = mapped_column(String(100))
     description: Mapped[Optional[str]] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(default=True)
 
@@ -27,6 +30,8 @@ class Ticket(Base):
     __tablename__ = "tickets"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # Always the customer's business. Stored on the ticket so every ticket query can filter on it.
+    business_id: Mapped[int] = mapped_column(ForeignKey("businesses.id"), index=True)
     title: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text)
     status: Mapped[TicketStatus] = mapped_column(

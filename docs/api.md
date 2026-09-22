@@ -10,13 +10,26 @@ Authenticated endpoints need the header `Authorization: Bearer <token>`.
 | GET | `/health` | anyone | API is running |
 | GET | `/health/db` | anyone | Database connection works |
 
+## Businesses (multi-tenancy)
+
+Every user belongs to exactly one business, and everything below only ever shows or changes
+data of the caller's own business. The business is never taken from a request: it comes from
+the signed-in user (the login token carries it as `bid`, and it must match the user's record).
+A resource of another business behaves exactly like one that does not exist (404), and an id
+from another business (a category, an agent, a handoff) is refused.
+
+| Method | Path | Who | Purpose |
+|---|---|---|---|
+| POST | `/businesses` | anyone | Create a business and its first admin: `business_name`, `business_slug` (its public code), `full_name`, `email`, `password` |
+| GET | `/businesses/{slug}` | anyone | A business's name for its code (for the sign-up page) |
+
 ## Authentication
 
 | Method | Path | Who | Purpose |
 |---|---|---|---|
-| POST | `/auth/register` | anyone | Register as a customer (JSON: full_name, email, password) |
-| POST | `/auth/login` | anyone | Login (form fields: `username` = email, `password`); returns token, role |
-| GET | `/auth/me` | any logged-in user | Current user |
+| POST | `/auth/register` | anyone | Register as a customer of a business (JSON: full_name, email, password, `business` = its code) |
+| POST | `/auth/login` | anyone | Login (form fields: `username` = email, `password`); returns token, role, business name |
+| GET | `/auth/me` | any logged-in user | Current user, with their business |
 
 ## Tickets
 

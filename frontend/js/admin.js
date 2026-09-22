@@ -46,13 +46,23 @@ function tableOrEmpty(rows, headings, empty) {
 
 /* ---------------------------------------------------------- dashboard */
 
+/** Customers join this business through its own sign-up link. */
+function signupLink() {
+  if (!session.businessSlug) return null;
+  const url = new URL(`register.html?business=${encodeURIComponent(session.businessSlug)}`, location.href).href;
+  return h("section", { class: "card card-pad business-link" },
+    h("p", { class: "label" }, `Customer sign-up link for ${session.business}`),
+    h("a", { href: url, class: "business-url" }, url),
+    h("p", { class: "meta" }, "Share it with your customers. Everyone who signs up with it joins your business only."));
+}
+
 function renderDashboard() {
   shell.setHeader("Dashboard", { subtitle: "How the support desk is running right now." });
 
   const stats = h("div", {}, skeletonStats(4));
   const charts = h("div", {});
   const latest = h("div", {});
-  shell.body.replaceChildren(h("div", { class: "stack" }, stats, charts, latest));
+  shell.body.replaceChildren(h("div", { class: "stack" }, signupLink(), stats, charts, latest));
 
   (async () => {
     let summary, tickets;

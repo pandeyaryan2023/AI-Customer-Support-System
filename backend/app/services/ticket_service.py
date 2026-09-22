@@ -39,8 +39,16 @@ def _agent_id(user: User) -> int | None:
     return user.agent_profile.id if user.agent_profile else None
 
 
+def same_business(user: User, ticket: Ticket) -> bool:
+    """Tenant isolation comes first: no role reaches another business's tickets."""
+    return ticket.business_id == user.business_id
+
+
 def can_view(user: User, ticket: Ticket) -> bool:
-    """Admin sees all. Customer sees own. Agent sees own assigned tickets and the unassigned queue."""
+    """Within the user's own business: admin sees all, a customer sees their own, an agent
+    sees their assigned tickets and the unassigned queue."""
+    if not same_business(user, ticket):
+        return False
     if user.role == Role.ADMIN:
         return True
     if user.role == Role.CUSTOMER:
@@ -51,7 +59,9 @@ def can_view(user: User, ticket: Ticket) -> bool:
 
 
 def can_manage(user: User, ticket: Ticket) -> bool:
-    """Admin can manage any ticket. An agent can only manage tickets assigned to them."""
+    """Within the user's own business: admin can manage any ticket, an agent only their own."""
+    if not same_business(user, ticket):
+        return False
     if user.role == Role.ADMIN:
         return True
     if user.role == Role.AGENT:
@@ -75,9 +85,10 @@ def _require_manage(user: User, ticket: Ticket) -> None:
         )
 
 
-def _check_category(db: Session, category_id: int) -> None:
+def _check_category(db: Session, category_id: int, business_id: int) -> None:
     category = db.get(Category, category_id)
-    if category is None or not category.is_active:
+    # Another business's category is treated exactly like one that does not exist.
+    if category is None or not category.is_active or category.business_id != business_id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Category does not exist or is inactive")
 
 
@@ -102,12 +113,13 @@ def create_ticket(db: Session, customer: User, data: TicketCreate) -> Ticket:
         if existing is not None:
             return existing  # the same handoff sent twice (double click, retry): one ticket
     if data.category_id is not None:
-        _check_category(db, data.category_id)
+        _check_category(db, data.category_id, customer.business_id)
     ticket = Ticket(
         title=data.title,
         description=data.description,
         category_id=data.category_id,
         customer_id=customer.id,
+        business_id=customer.business_id,  # never from the request
         handoff_id=handoff.handoff_id if handoff else None,
         ai_handoff=handoff.ticket_context() if handoff else None,
     )
@@ -144,7 +156,8 @@ def list_tickets(
     priority: Priority | None = None,
     unassigned: bool | None = None,
 ) -> list[Ticket]:
-    stmt = select(Ticket)
+    # Only the user's own business, whatever their role; then the role narrows it further.
+    stmt = select(Ticket).where(Ticket.business_id == user.business_id)
 
     # The role decides which tickets are even candidates.
     if user.role == Role.CUSTOMER:
@@ -191,7 +204,7 @@ def add_message(db: Session, user: User, ticket: Ticket, text: str) -> TicketMes
 def update_ticket(db: Session, user: User, ticket: Ticket, data: TicketUpdate) -> Ticket:
     _require_manage(user, ticket)
     if data.category_id is not None:
-        _check_category(db, data.category_id)
+        _check_category(db, data.category_id, ticket.business_id)
         ticket.category_id = data.category_id
     if data.priority is not None:
         ticket.priority = data.priority
@@ -205,7 +218,8 @@ def update_ticket(db: Session, user: User, ticket: Ticket, data: TicketUpdate) -
 def assign_ticket(db: Session, user: User, ticket: Ticket, agent_id: int) -> Ticket:
     """Admin can assign anywhere. An agent can claim an unassigned ticket, or hand over their own."""
     agent = db.get(Agent, agent_id)
-    if agent is None or not agent.user.is_active:
+    # Only an active agent of the ticket's own business; anyone else is "not found".
+    if agent is None or not agent.user.is_active or agent.user.business_id != ticket.business_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Agent not found")
     if ticket.status == TicketStatus.CLOSED:
         raise HTTPException(status.HTTP_409_CONFLICT, "This ticket is closed")

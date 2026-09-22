@@ -6,7 +6,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
-from app.api import admin, agents, ai, auth, categories, documents, search, tickets
+from app.api import admin, agents, ai, auth, businesses, categories, documents, search, tickets
 from app.api.deps import DbSession
 from app.core.config import settings
 
@@ -24,6 +24,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(businesses.router)
 app.include_router(tickets.router)
 app.include_router(categories.router)
 app.include_router(agents.router)

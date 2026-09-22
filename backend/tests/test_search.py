@@ -41,7 +41,8 @@ def add_document(session_factory, admin):
         with session_factory() as db:
             document = Document(title=title, original_filename=f"{title}.txt",
                                 stored_filename=f"{uuid.uuid4().hex}.txt", content_type="text/plain",
-                                size_bytes=100, uploaded_by_id=admin.id, status=status,
+                                size_bytes=100, uploaded_by_id=admin.id, business_id=admin.business_id,
+                                status=status,
                                 index_status=index_status, chunk_count=len(chunks))
             db.add(document)
             db.flush()

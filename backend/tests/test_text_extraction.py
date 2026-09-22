@@ -176,7 +176,7 @@ def test_document_stored_before_phase_2_can_be_extracted(client, admin, storage,
     with session_factory() as db:
         db.add(Document(title="Old refund policy", original_filename="refund.pdf",
                         stored_filename="0123abcd.pdf", content_type="application/pdf",
-                        size_bytes=len(pdf), uploaded_by_id=admin.id))
+                        size_bytes=len(pdf), uploaded_by_id=admin.id, business_id=admin.business_id))
         db.commit()
 
     [doc] = client.get(URL, headers=admin.headers).json()

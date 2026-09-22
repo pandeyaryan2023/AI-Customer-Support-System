@@ -44,16 +44,17 @@ MESSAGES = {
 
 @dataclass(frozen=True)
 class SearchScope:
-    """Which knowledge base a search may read.
+    """Which knowledge base a search may read: one business's.
 
     Always built on the server from the signed-in user (see scope_for), never from
-    request data. There is one business today, so it has no fields yet. Multi-tenancy
-    adds a business_id here and one filter in _load_candidates; nothing else changes.
+    request data, so no request can make a search read another business's chunks.
     """
+
+    business_id: int
 
 
 def scope_for(user: User) -> SearchScope:
-    return SearchScope()
+    return SearchScope(business_id=user.business_id)
 
 
 @dataclass(frozen=True)
@@ -127,11 +128,11 @@ def _load_candidates(db: Session, scope: SearchScope) -> list:
         select(DocumentChunk.id, DocumentChunk.document_id, DocumentChunk.chunk_index,
                DocumentChunk.text, DocumentChunk.embedding, Document.title)
         .join(Document, Document.id == DocumentChunk.document_id)
+        .where(Document.business_id == scope.business_id)  # this business's knowledge only
         .where(Document.index_status == IndexStatus.INDEXED)
         .where(DocumentChunk.embedding_model == settings.embedding_model)
         .order_by(DocumentChunk.document_id, DocumentChunk.chunk_index)
     )
-    # Multi-tenancy: stmt = stmt.where(Document.business_id == scope.business_id)
     try:
         return list(db.execute(stmt).all())
     except SQLAlchemyError as error:

@@ -37,9 +37,9 @@ def refresh_index(db: Session, document: Document) -> Document:
     return _replace_chunks(db, document, [], IndexStatus.NOT_INDEXED)  # no text, so no chunks
 
 
-def reindex(db: Session, document_id: int) -> Document:
-    """Run Phase 3 again for one document, e.g. after Ollama was not running."""
-    document = document_service.get_document(db, document_id)
+def reindex(db: Session, document_id: int, business_id: int) -> Document:
+    """Run Phase 3 again for one of this business's documents, e.g. after Ollama was not running."""
+    document = document_service.get_document(db, document_id, business_id)
     if document.status != DocumentStatus.EXTRACTED:
         raise HTTPException(status.HTTP_409_CONFLICT,
                             "The document's text must be extracted before it can be indexed")
@@ -100,8 +100,8 @@ def _replace_chunks(db: Session, document: Document, rows: list[DocumentChunk],
     return document
 
 
-def list_chunks(db: Session, document_id: int) -> list[DocumentChunk]:
-    document_service.get_document(db, document_id)  # 404 if there is no such document
+def list_chunks(db: Session, document_id: int, business_id: int) -> list[DocumentChunk]:
+    document_service.get_document(db, document_id, business_id)  # 404 unless it is this business's
     stmt = (select(DocumentChunk)
             .where(DocumentChunk.document_id == document_id)
             .order_by(DocumentChunk.chunk_index))

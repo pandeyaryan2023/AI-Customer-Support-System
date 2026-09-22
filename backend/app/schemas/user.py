@@ -72,3 +72,4 @@ class Token(BaseModel):
     token_type: str = "bearer"
     role: Role
     full_name: str
+    business_name: str

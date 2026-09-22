@@ -278,6 +278,6 @@ def test_token_carries_only_what_the_agent_needs(client, customer, knowledge_bas
     ollama(reply="I don't have enough information to answer that.")
     token = ask(client, customer, "Can I pay in instalments?")["handoff_token"]
     claims = jwt.decode(token, options={"verify_signature": False})  # readable, but only the server can sign
-    assert set(claims) == {"aud", "sub", "jti", "iat", "exp", "question", "ai_status", "reason", "sources"}
+    assert set(claims) == {"aud", "sub", "bid", "jti", "iat", "exp", "question", "ai_status", "reason", "sources"}
     assert REFUND_TEXT not in str(claims) and "Rules" not in str(claims)  # no article text, no prompt
     assert claims["sources"] == [{"document_title": "Support policy", "chunk_index": 0, "similarity": 0.9091}]

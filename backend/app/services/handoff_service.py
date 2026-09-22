@@ -61,6 +61,7 @@ def issue_token(user: User, question: str, answer: Answer) -> str | None:
     payload = {
         "aud": AUDIENCE,
         "sub": str(user.id),
+        "bid": user.business_id,  # the business the question was asked in
         "jti": uuid.uuid4().hex,  # this handoff's id: one ticket at most per handoff
         "iat": now,
         "exp": now + timedelta(minutes=settings.handoff_token_expire_minutes),
@@ -76,13 +77,13 @@ def read_token(token: str, user: User) -> Handoff:
     """Check a token and return its handoff, or raise HandoffError."""
     try:
         claims = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm],
-                            audience=AUDIENCE, options={"require": ["exp", "sub", "jti"]})
+                            audience=AUDIENCE, options={"require": ["exp", "sub", "bid", "jti"]})
     except jwt.ExpiredSignatureError as error:
         raise HandoffError("This AI conversation has expired. Please ask your question again.") from error
     except jwt.PyJWTError as error:
         raise HandoffError("This AI handoff is not valid.") from error
     # Someone else's handoff gets the same answer as a forged one: nothing is revealed about it.
-    if claims["sub"] != str(user.id):
+    if claims["sub"] != str(user.id) or claims["bid"] != user.business_id:
         raise HandoffError("This AI handoff is not valid.")
     try:
         return Handoff(

@@ -4,7 +4,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
-from app.core.security import decode_access_token
+from app.core.security import read_access_token
 from app.database.session import get_db
 from app.models import Role, User
 
@@ -15,10 +15,15 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
 def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: DbSession) -> User:
-    """AUTHENTICATION: who is calling? Read the JWT and load that user from the database."""
-    user_id = decode_access_token(token)
-    user = db.get(User, user_id) if user_id is not None else None
-    if user is None or not user.is_active:
+    """AUTHENTICATION: who is calling, and for which business? Read the JWT and load that user.
+
+    From here on the tenant is always user.business_id, taken from the database row. The
+    token's business must still match it, and the business must still be active.
+    """
+    claims = read_access_token(token)
+    user = db.get(User, claims[0]) if claims is not None else None
+    if (user is None or not user.is_active or user.business_id != claims[1]
+            or not user.business.is_active):
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED,
             "Invalid or expired token",

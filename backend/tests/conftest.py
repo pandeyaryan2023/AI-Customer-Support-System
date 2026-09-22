@@ -20,7 +20,7 @@ from app.core.security import hash_password  # noqa: E402
 from app.database.base import Base  # noqa: E402
 from app.database.session import get_db  # noqa: E402
 from app.main import app  # noqa: E402
-from app.models import Agent, Category, Role, User  # noqa: E402
+from app.models import Agent, Business, Category, Role, User  # noqa: E402
 
 PASSWORD = "password123"
 
@@ -90,13 +90,25 @@ def client(session_factory):
     app.dependency_overrides.clear()
 
 
+@pytest.fixture(autouse=True)
+def default_business(session_factory):
+    """The business every test user belongs to unless a test says otherwise (code "acme")."""
+    with session_factory() as db:
+        business = Business(name="Acme Store", slug="acme")
+        db.add(business)
+        db.commit()
+        return SimpleNamespace(id=business.id, name=business.name, slug=business.slug)
+
+
 @pytest.fixture()
-def make_user(client, session_factory):
+def make_user(client, session_factory, default_business):
     """Create a user directly in the database, log in, and return their id + auth headers."""
 
-    def _make(role: Role, email: str, name: str = "Test User"):
+    def _make(role: Role, email: str, name: str = "Test User", business_id: int | None = None):
+        business_id = business_id or default_business.id
         with session_factory() as db:
-            user = User(full_name=name, email=email, hashed_password=hash_password(PASSWORD), role=role)
+            user = User(full_name=name, email=email, hashed_password=hash_password(PASSWORD), role=role,
+                        business_id=business_id)
             db.add(user)
             db.flush()
             agent_id = None
@@ -110,15 +122,15 @@ def make_user(client, session_factory):
         response = client.post("/auth/login", data={"username": email, "password": PASSWORD})
         assert response.status_code == 200, response.text
         headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
-        return SimpleNamespace(id=user_id, agent_id=agent_id, headers=headers)
+        return SimpleNamespace(id=user_id, agent_id=agent_id, headers=headers, business_id=business_id)
 
     return _make
 
 
 @pytest.fixture()
-def category_id(session_factory):
+def category_id(session_factory, default_business):
     with session_factory() as db:
-        category = Category(name="Billing")
+        category = Category(name="Billing", business_id=default_business.id)
         db.add(category)
         db.commit()
         return category.id

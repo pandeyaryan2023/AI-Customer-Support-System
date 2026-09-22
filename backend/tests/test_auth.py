@@ -3,7 +3,7 @@ from app.models import Role
 
 def register(client, email="asha@example.com", password="password123", name="Asha Rao"):
     return client.post(
-        "/auth/register", json={"full_name": name, "email": email, "password": password}
+        "/auth/register", json={"full_name": name, "email": email, "password": password, "business": "acme"}
     )
 
 
@@ -33,7 +33,8 @@ def test_register_validation(client):
 def test_register_cannot_choose_role(client):
     response = client.post(
         "/auth/register",
-        json={"full_name": "Sneaky", "email": "s@example.com", "password": "password123", "role": "ADMIN"},
+        json={"full_name": "Sneaky", "email": "s@example.com", "password": "password123", "role": "ADMIN",
+              "business": "acme"},
     )
     assert response.status_code == 201
     assert response.json()["role"] == "CUSTOMER"

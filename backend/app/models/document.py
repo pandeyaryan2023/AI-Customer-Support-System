@@ -16,6 +16,8 @@ class Document(Base):
     __tablename__ = "documents"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # The business whose knowledge base this is. Its chunks are only ever searched for that business.
+    business_id: Mapped[int] = mapped_column(ForeignKey("businesses.id"), index=True)
     title: Mapped[str] = mapped_column(String(200))
     # What the uploader called the file. Shown to people, NEVER used to build a path.
     original_filename: Mapped[str] = mapped_column(String(255))

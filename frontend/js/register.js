@@ -5,6 +5,27 @@ const confirmField = document.getElementById("confirm-field");
 const confirmError = document.getElementById("confirm-error");
 const passwordInput = document.getElementById("password");
 const confirmInput = document.getElementById("confirm");
+const businessInput = document.getElementById("business");
+const businessHint = document.getElementById("business-hint");
+
+// The sign-up link a company shares looks like register.html?business=acme
+businessInput.value = new URLSearchParams(location.search).get("business") || "";
+
+/** Show which company this account will belong to, so nobody joins the wrong one. */
+async function describeBusiness() {
+  const code = businessInput.value.trim().toLowerCase();
+  if (!code) return;
+  try {
+    const business = await api(`/businesses/${encodeURIComponent(code)}`);
+    businessHint.textContent = `You are joining ${business.name}'s support portal.`;
+    businessHint.classList.remove("field-error");
+  } catch {
+    businessHint.textContent = "No business uses this code. Check the link you were given.";
+    businessHint.classList.add("field-error");
+  }
+}
+businessInput.addEventListener("change", describeBusiness);
+describeBusiness();
 
 /** Inline error under the confirm field — shown on submit, cleared as soon as it matches. */
 function showMismatch(show) {
@@ -34,6 +55,7 @@ form.addEventListener("submit", (event) => {
         full_name: document.getElementById("full-name").value,
         email: document.getElementById("email").value.trim(),
         password,
+        business: businessInput.value.trim(),
       },
     });
     location.href = "login.html?registered=1";

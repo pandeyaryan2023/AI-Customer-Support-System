@@ -26,10 +26,16 @@
         </div>
 
         <h1 class="auth-title">Create your account</h1>
-        <p class="auth-sub">Customers register here. Agent and admin accounts are created by an administrator.</p>
+        <p class="auth-sub">Customers register on their company's support portal. Agent and admin accounts are created by that company's administrator.</p>
 
         <form id="register-form" novalidate>
           <div class="auth-fields">
+            <div class="field">
+              <label for="business">Business code</label>
+              <input id="business" type="text" autocomplete="off" minlength="3" maxlength="50"
+                     placeholder="acme" required>
+              <p class="field-hint" id="business-hint">The company whose support you need. The code is in the sign-up link they gave you.</p>
+            </div>
             <div class="field">
               <label for="full-name">Full name</label>
               <input id="full-name" type="text" autocomplete="name" minlength="2" maxlength="100"

@@ -73,7 +73,10 @@ class TicketAnalysis:
 
 
 def analyze_ticket(db: Session, ticket: Ticket) -> TicketAnalysis:
-    categories = list(db.scalars(select(Category).where(Category.is_active).order_by(Category.name)))
+    # Only the ticket's own business's categories: another business's names must never reach the model.
+    categories = list(db.scalars(select(Category)
+                                 .where(Category.business_id == ticket.business_id, Category.is_active)
+                                 .order_by(Category.name)))
     context, ignored = build_ticket_context(ticket, categories)
     messages = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": context}]
     try:

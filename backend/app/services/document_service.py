@@ -96,6 +96,7 @@ def save_document(db: Session, admin: User, title: str, upload: UploadFile) -> D
         content_type=ALLOWED_TYPES[extension],
         size_bytes=len(data),
         uploaded_by_id=admin.id,
+        business_id=admin.business_id,
     )
     db.add(document)
     try:
@@ -146,15 +147,16 @@ def _record_failure(document: Document, reason: str) -> None:
     document.extraction_error = reason[:300]
 
 
-def get_document(db: Session, document_id: int) -> Document:
+def get_document(db: Session, document_id: int, business_id: int) -> Document:
+    """A document of this business. Another business's document is simply "not found"."""
     document = db.get(Document, document_id)
-    if document is None:
+    if document is None or document.business_id != business_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Document not found")
     return document
 
 
-def get_text(db: Session, document_id: int) -> Document:
-    document = get_document(db, document_id)
+def get_text(db: Session, document_id: int, business_id: int) -> Document:
+    document = get_document(db, document_id, business_id)
     if document.status != DocumentStatus.EXTRACTED:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
@@ -163,13 +165,14 @@ def get_text(db: Session, document_id: int) -> Document:
     return document
 
 
-def list_documents(db: Session) -> list[Document]:
-    stmt = select(Document).order_by(Document.created_at.desc(), Document.id.desc())
+def list_documents(db: Session, business_id: int) -> list[Document]:
+    stmt = (select(Document).where(Document.business_id == business_id)
+            .order_by(Document.created_at.desc(), Document.id.desc()))
     return list(db.scalars(stmt).all())
 
 
-def delete_document(db: Session, document_id: int) -> None:
-    document = get_document(db, document_id)
+def delete_document(db: Session, document_id: int, business_id: int) -> None:
+    document = get_document(db, document_id, business_id)
     path = storage_path(document)
     db.execute(delete(DocumentChunk).where(DocumentChunk.document_id == document.id))
     db.delete(document)

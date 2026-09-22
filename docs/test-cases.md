@@ -1,6 +1,6 @@
 # Test cases
 
-Automated tests: `cd backend; pytest`. Last run: **329 passed, 20 skipped** (2026-09-22), using
+Automated tests: `cd backend; pytest`. Last run: **362 passed, 20 skipped** (2026-09-22), using
 in-memory SQLite and a fake Ollama (`tests/conftest.py`), so no test needs Ollama running.
 The 20 skipped are the opt-in real-model tests (`RUN_OLLAMA_TESTS=1`): **20 passed** when run.
 Not yet covered by pytest: PostgreSQL-specific behaviour, AI, AWS (none built yet).
@@ -365,6 +365,60 @@ was unchanged after analysis. Browser (Edge): 13 checks - customer sees no AI ca
 only after claiming and uses the normal update; Use draft fills the reply box and sends nothing;
 the agent's own click sends the edited reply; injection warning shown; 0 console errors; 390 px fits
 (after a fix to the card header).
+
+## Multi-tenancy (`tests/test_tenancy.py`, 33 tests)
+
+Two businesses with a customer, agent, admin, a "Billing" category, a ticket and a refund policy each.
+The two policies are equally similar to a refund question, so a leak would show.
+
+| Case | Expected |
+|---|---|
+| Business sign-up; login; `/auth/me` | Business + admin created; token carries `bid`; business shown |
+| Taken or invalid business code; sign-up with a taken email | 409 / 422; nothing left behind |
+| Public lookup by code | Name and code only; unknown -> 404 |
+| Customer registers with a business code; unknown or missing code; email used in another business | Joins that business; 404 / 422; 409 |
+| Signed token claiming another business; token without a business | 401 |
+| Disabled business | Its tokens stop working, login 403, the other business unaffected |
+| 1-2 Customer reads or messages the other business's ticket | 404, nothing arrives |
+| 8 Agent: view, claim, message, change, escalate the other business's ticket; queue | 404 each; own queue only |
+| 12 Ticket AI on the other business's ticket; categories offered for own ticket | 404, model not called; own categories only |
+| 9 Admin: other business's ticket, users, agents, categories, documents | 404 / not listed; nothing changed |
+| 15 Statistics; staff lists of agents and categories | Own business only |
+| 10 Category or agent id of the other business | 400 / 404 |
+| 11 `business_id` in a request body | Ignored (ticket, category, upload) or rejected (search, ask: 422) |
+| 3-4 Documents of the other business: read, chunks, delete | Customers 403; other admin 404; document kept |
+| 13 Index or extract the other business's document | 404, nothing embedded |
+| 14 Search with both policies equally similar | Each admin gets only their own chunk; 1 chunk searched |
+| 5-6 Customer search; RAG answer | 403; the model sees only the customer's own business's policy |
+| Empty knowledge base in one business | Not filled from the other; model not called |
+| 7 Another business's handoff token; mismatched business in a handoff | 400, no ticket |
+| Handoff ticket | In the customer's business and queue only |
+| Same-business workflow; category names; agent created by an admin | Works; unique per business only; joins that business |
+
+Twelve isolation safeguards were each removed on purpose (search, ticket view, ticket list,
+documents, ticket-AI categories, token business, handoff business, foreign category, foreign
+agent, admin user list, statistics, new-ticket business): the tests caught every one.
+
+Real check (2026-09-22, empty scratch PostgreSQL, all migrations, real models): two businesses
+created through `POST /businesses`, each with its own help-centre document.
+
+| Question | Acme Store (30 days, 3-5 days) | Globex Retail (7 days, 1-2 days) |
+|---|---|---|
+| How many days do I have to get a refund? | "You have 30 days from the date of purchase to request a refund." (Acme help centre) | "You have 7 days from the date of purchase to request a refund." (Globex help centre) |
+| How long does shipping take? | "Standard delivery typically takes 3 to 5 business days." | "Standard delivery typically takes 1 to 2 business days." |
+
+Each search read 1 chunk (its own); tickets, queues, AI analysis, document delete/re-index, stats
+and handoff tokens did not cross in either direction; PostgreSQL showed 3 users, 1 ticket,
+1 document, 1 chunk and 3 categories per business and no ticket or document in a different
+business from its owner. 17/17 API checks, 2/2 database checks. Browser (Edge): business sign-up
+page, sign-up link on the admin dashboard, registration via `register.html?business=acme`, business
+name in every sidebar, the same question answered from each business's own article, agent queue
+and cross-business URL ("Ticket not found"), admin lists: 14 checks passed; normal use for
+3 roles in 2 businesses gave 0 console errors (the only one was the deliberate 404 above).
+
+Migration 0006 was rehearsed on scratch PostgreSQL with pre-tenancy data (moved to "Default
+business", nothing lost), downgraded and upgraded again, and on an empty database (no business
+created). The 20 opt-in real-model retrieval tests still pass.
 
 ## Manual tests still to do
 

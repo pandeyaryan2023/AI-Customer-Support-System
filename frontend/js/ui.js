@@ -255,7 +255,9 @@ function mountShell(session, { active, onNavigate, home } = {}) {
       brandMark(),
       h("span", {},
         h("span", { class: "brand-name" }, "Support Desk"),
-        h("span", { class: "brand-sub" }, ROLE_SUBTITLE[session.role] || ""))),
+        // The business this user works in: everything on these pages belongs to it.
+        h("span", { class: "brand-sub", title: "Your business" },
+          session.business || ROLE_SUBTITLE[session.role] || ""))),
     h("nav", { class: "sidebar-nav" }, navLinks),
     h("div", { class: "sidebar-user" },
       avatar(session.name),

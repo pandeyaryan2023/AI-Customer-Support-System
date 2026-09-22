@@ -2,22 +2,26 @@
 
 PostgreSQL, accessed through SQLAlchemy, created by Alembic migrations
 `0001_create_core_tables`, `0002_add_documents_table`, `0003_add_document_text_extraction`, `0004_add_document_chunks` and
-`0005_add_ticket_ai_handoff`.
+`0005_add_ticket_ai_handoff` and `0006_add_businesses_multi_tenancy`.
 
 ## Tables
 
 | Table | Purpose | Key columns |
 |---|---|---|
-| `users` | Everyone who can log in | `id` PK, `email` (unique), `hashed_password`, `role` (CUSTOMER / AGENT / ADMIN), `is_active` |
+| `businesses` | The companies using the service (tenants) | `id` PK, `name`, `slug` (unique public code), `is_active`, `created_at` |
+| `users` | Everyone who can log in | `id` PK, `business_id` FK -> businesses, `email` (unique across all businesses), `hashed_password`, `role` (CUSTOMER / AGENT / ADMIN), `is_active` |
 | `agents` | Extra details for agent users (1-to-1 with `users`) | `id` PK, `user_id` FK -> users (unique), `department` |
-| `categories` | Complaint categories managed by the admin | `id` PK, `name` (unique), `is_active` |
-| `tickets` | Customer complaints | `id` PK, `customer_id` FK -> users, `assigned_agent_id` FK -> agents (nullable), `category_id` FK -> categories (nullable), `status`, `priority`, `handoff_id` (unique, nullable), `ai_handoff` (JSON, nullable) |
+| `categories` | Complaint categories managed by the admin | `id` PK, `business_id` FK -> businesses, `name` (unique within the business), `is_active` |
+| `tickets` | Customer complaints | `id` PK, `business_id` FK -> businesses (always the customer's), `customer_id` FK -> users, `assigned_agent_id` FK -> agents (nullable), `category_id` FK -> categories (nullable), `status`, `priority`, `handoff_id` (unique, nullable), `ai_handoff` (JSON, nullable) |
 | `ticket_messages` | Conversation on a ticket | `id` PK, `ticket_id` FK -> tickets, `sender_id` FK -> users, `message` |
-| `documents` | Knowledge-base files (the bytes are on disk, not in the database) | `id` PK, `title`, `original_filename` (display only), `stored_filename` (unique, generated), `content_type`, `size_bytes`, `uploaded_by_id` FK -> users, `status` (PENDING / EXTRACTED / FAILED), `extracted_text`, `page_count`, `char_count`, `extraction_error`, `index_status` (NOT_INDEXED / INDEXED / FAILED), `chunk_count`, `index_error` |
+| `documents` | Knowledge-base files (the bytes are on disk, not in the database) | `id` PK, `business_id` FK -> businesses, `title`, `original_filename` (display only), `stored_filename` (unique, generated), `content_type`, `size_bytes`, `uploaded_by_id` FK -> users, `status` (PENDING / EXTRACTED / FAILED), `extracted_text`, `page_count`, `char_count`, `extraction_error`, `index_status` (NOT_INDEXED / INDEXED / FAILED), `chunk_count`, `index_error` |
 | `document_chunks` | Pieces of a document's text with their embedding vectors | `id` PK, `document_id` FK -> documents (ON DELETE CASCADE), `chunk_index`, `text`, `word_count`, `embedding` (JSONB list of 768 numbers), `embedding_model`, `created_at`; unique (`document_id`, `chunk_index`) |
 
 ## Relationships
 
+- A business **has** many users, categories, tickets and documents. Agents, ticket messages and
+  document chunks belong to a business through their user, ticket and document, so they have no
+  `business_id` of their own.
 - A customer (user) **raises** many tickets. `tickets.customer_id -> users.id`
 - An agent is **assigned** many tickets; a ticket has at most one agent. `tickets.assigned_agent_id -> agents.id`
 - A ticket **belongs to** at most one category. `tickets.category_id -> categories.id`
@@ -44,6 +48,14 @@ A ticket raised through "Talk to Human Support" stores the AI context in `ticket
 (the original question, why the AI stopped, the articles it looked at) and the handoff's id in
 `tickets.handoff_id`, whose unique index allows one ticket per handoff. Both are NULL for all
 other tickets; migration 0005 changes no existing data.
+
+Migration 0006 adds multi-tenancy without losing data: if the database already has rows, it
+creates one business, "Default business" (code `default`), and moves every existing user,
+category, ticket and document into it; then `business_id` becomes required. An empty database
+gets no business. Category names become unique per business (`uq_categories_business_name`)
+instead of across the system. Indexes: `users.business_id`, `tickets.business_id`,
+`documents.business_id`; categories use their unique (`business_id`, `name`) index. Going back
+(`alembic downgrade 0005`) works unless two businesses share a category name.
 
 ## Enumerated values (stored as text)
 

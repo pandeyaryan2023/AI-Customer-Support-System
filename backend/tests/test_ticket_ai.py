@@ -25,10 +25,11 @@ GOOD = {
 
 
 @pytest.fixture()
-def categories(session_factory):
+def categories(session_factory, default_business):
     with session_factory() as db:
-        rows = [Category(name=name) for name in ("Technical Issue", "Refunds", "Delivery", "Billing")]
-        rows.append(Category(name="Old Promotions", is_active=False))
+        rows = [Category(name=name, business_id=default_business.id)
+                for name in ("Technical Issue", "Refunds", "Delivery", "Billing")]
+        rows.append(Category(name="Old Promotions", is_active=False, business_id=default_business.id))
         db.add_all(rows)
         db.commit()
         return {c.name: c.id for c in rows}

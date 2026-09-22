@@ -37,44 +37,44 @@ def upload_document(
 
 
 @router.get("", response_model=list[DocumentOut])
-def list_documents(db: DbSession):
-    return document_service.list_documents(db)
+def list_documents(db: DbSession, admin: Admin):
+    return document_service.list_documents(db, admin.business_id)
 
 
 @router.post("/{document_id}/extract", response_model=DocumentOut)
-def extract_document(document_id: int, db: DbSession):
+def extract_document(document_id: int, db: DbSession, admin: Admin):
     """Extract (or re-extract) the text of a stored document.
 
     Used for documents uploaded before text extraction existed, and to retry a failure.
     The chunks are then rebuilt from the new text.
     """
-    document = document_service.get_document(db, document_id)
+    document = document_service.get_document(db, document_id, admin.business_id)
     document = document_service.extract_document(db, document)
     return indexing_service.refresh_index(db, document)
 
 
 @router.get("/{document_id}/text", response_model=DocumentTextOut)
-def get_document_text(document_id: int, db: DbSession):
+def get_document_text(document_id: int, db: DbSession, admin: Admin):
     """The extracted text of one document. 409 if it has none (PENDING or FAILED)."""
-    return document_service.get_text(db, document_id)
+    return document_service.get_text(db, document_id, admin.business_id)
 
 
 @router.post("/{document_id}/index", response_model=DocumentOut)
-def index_document(document_id: int, db: DbSession):
+def index_document(document_id: int, db: DbSession, admin: Admin):
     """Chunk and embed the extracted text again, replacing any previous chunks.
 
     Used to retry after Ollama was unavailable. 409 if the text is not extracted.
     """
-    return indexing_service.reindex(db, document_id)
+    return indexing_service.reindex(db, document_id, admin.business_id)
 
 
 @router.get("/{document_id}/chunks", response_model=list[ChunkOut])
-def list_document_chunks(document_id: int, db: DbSession):
+def list_document_chunks(document_id: int, db: DbSession, admin: Admin):
     """The stored chunks, in order, with each embedding's length and first numbers."""
-    return indexing_service.list_chunks(db, document_id)
+    return indexing_service.list_chunks(db, document_id, admin.business_id)
 
 
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_document(document_id: int, db: DbSession):
+def delete_document(document_id: int, db: DbSession, admin: Admin):
     """Remove a document and its file, so an outdated policy can no longer be used."""
-    document_service.delete_document(db, document_id)
+    document_service.delete_document(db, document_id, admin.business_id)
