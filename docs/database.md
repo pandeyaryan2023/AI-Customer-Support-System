@@ -1,7 +1,8 @@
 # Database design
 
 PostgreSQL, accessed through SQLAlchemy, created by Alembic migrations
-`0001_create_core_tables`, `0002_add_documents_table`, `0003_add_document_text_extraction` and `0004_add_document_chunks`.
+`0001_create_core_tables`, `0002_add_documents_table`, `0003_add_document_text_extraction`, `0004_add_document_chunks` and
+`0005_add_ticket_ai_handoff`.
 
 ## Tables
 
@@ -10,7 +11,7 @@ PostgreSQL, accessed through SQLAlchemy, created by Alembic migrations
 | `users` | Everyone who can log in | `id` PK, `email` (unique), `hashed_password`, `role` (CUSTOMER / AGENT / ADMIN), `is_active` |
 | `agents` | Extra details for agent users (1-to-1 with `users`) | `id` PK, `user_id` FK -> users (unique), `department` |
 | `categories` | Complaint categories managed by the admin | `id` PK, `name` (unique), `is_active` |
-| `tickets` | Customer complaints | `id` PK, `customer_id` FK -> users, `assigned_agent_id` FK -> agents (nullable), `category_id` FK -> categories (nullable), `status`, `priority` |
+| `tickets` | Customer complaints | `id` PK, `customer_id` FK -> users, `assigned_agent_id` FK -> agents (nullable), `category_id` FK -> categories (nullable), `status`, `priority`, `handoff_id` (unique, nullable), `ai_handoff` (JSON, nullable) |
 | `ticket_messages` | Conversation on a ticket | `id` PK, `ticket_id` FK -> tickets, `sender_id` FK -> users, `message` |
 | `documents` | Knowledge-base files (the bytes are on disk, not in the database) | `id` PK, `title`, `original_filename` (display only), `stored_filename` (unique, generated), `content_type`, `size_bytes`, `uploaded_by_id` FK -> users, `status` (PENDING / EXTRACTED / FAILED), `extracted_text`, `page_count`, `char_count`, `extraction_error`, `index_status` (NOT_INDEXED / INDEXED / FAILED), `chunk_count`, `index_error` |
 | `document_chunks` | Pieces of a document's text with their embedding vectors | `id` PK, `document_id` FK -> documents (ON DELETE CASCADE), `chunk_index`, `text`, `word_count`, `embedding` (JSONB list of 768 numbers), `embedding_model`, `created_at`; unique (`document_id`, `chunk_index`) |
@@ -38,6 +39,11 @@ PostgreSQL version). The unique (`document_id`, `chunk_index`) constraint makes 
 itself refuse duplicate chunks, and also indexes `document_id`. Chunks are never edited, only
 replaced, so they have `created_at` and no `updated_at`. Migration 0004 gives existing
 documents `index_status = 'NOT_INDEXED'`.
+
+A ticket raised through "Talk to Human Support" stores the AI context in `tickets.ai_handoff`
+(the original question, why the AI stopped, the articles it looked at) and the handoff's id in
+`tickets.handoff_id`, whose unique index allows one ticket per handoff. Both are NULL for all
+other tickets; migration 0005 changes no existing data.
 
 ## Enumerated values (stored as text)
 

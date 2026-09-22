@@ -112,7 +112,9 @@ function detailCard() {
         h("div", { style: "flex:1;min-width:0" },
           h("p", { class: "ticket-id" }, `#${ticket.id}`),
           h("h2", { class: "ticket-subject" }, ticket.title)),
-        h("div", { class: "row" }, statusBadge(ticket.status), priorityBadge(ticket.priority))),
+        h("div", { class: "row" },
+          ticket.from_ai_handoff ? h("span", { class: "badge badge-plain ai-label" }, "AI handoff") : null,
+          statusBadge(ticket.status), priorityBadge(ticket.priority))),
       pipeline(ticket.status)),
 
     h("dl", { class: "facts" },
@@ -124,7 +126,25 @@ function detailCard() {
 
     h("div", { class: "description" },
       h("h3", { class: "section-title" }, "What the customer reported"),
-      h("p", {}, ticket.description)));
+      h("p", {}, ticket.description)),
+    ticket.ai_handoff ? handoffSection(ticket.ai_handoff) : null);
+}
+
+/* What the AI assistant knew when the customer asked for a person (Phase 6 handoff). */
+function handoffSection(handoff) {
+  return h("div", { class: "description handoff" },
+    h("h3", { class: "section-title" }, "Handed over from the AI assistant"),
+    h("p", { class: "handoff-question" }, `“${handoff.question}”`),
+    h("p", { class: "meta" }, `${handoff.reason} Asked ${fmtDate(handoff.asked_at)}.`),
+    handoff.sources.length
+      ? h("div", {},
+          h("h4", { class: "label ask-sources-title" }, "Articles the assistant checked"),
+          h("ul", { class: "source-list" }, handoff.sources.map((source) =>
+            h("li", { class: "source-item" }, icon("file"),
+              h("span", { class: "strong" }, source.document_title),
+              h("span", { class: "meta" }, `Part ${source.chunk_index + 1}`),
+              h("span", { class: "meta source-score" }, `Relevance ${source.similarity.toFixed(2)}`)))))
+      : h("p", { class: "meta" }, "This may be a gap in the knowledge base."));
 }
 
 function fact(label, value) {

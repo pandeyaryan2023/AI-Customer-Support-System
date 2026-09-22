@@ -1,6 +1,6 @@
 # Test cases
 
-Automated tests: `cd backend; pytest`. Last run: **261 passed, 20 skipped** (2026-09-22), using
+Automated tests: `cd backend; pytest`. Last run: **284 passed, 20 skipped** (2026-09-22), using
 in-memory SQLite and a fake Ollama (`tests/conftest.py`), so no test needs Ollama running.
 The 20 skipped are the opt-in real-model tests (`RUN_OLLAMA_TESTS=1`): **20 passed** when run.
 Not yet covered by pytest: PostgreSQL-specific behaviour, AI, AWS (none built yet).
@@ -287,6 +287,40 @@ Real check with `llama3.2:3b` (2026-09-22, scratch PostgreSQL, the test PDF):
 Two customer override attempts and three questions against documents containing injected
 instructions produced no false answer ("Are refunds unlimited?" -> "No, refunds are only available
 within 30 days of purchase."). Browser (Edge): 9/9 checks, 0 console errors, 390 px layout.
+
+## Human handoff (`tests/test_handoff.py`, 23 tests)
+
+| Case | Expected |
+|---|---|
+| Answered question | No handoff offered, no ticket |
+| Unanswered question | Handoff token offered, **no ticket until the customer chooses** |
+| Admin asks | No handoff (only customers raise tickets) |
+| Customer sends the handoff | 201, OPEN / MEDIUM, owner = caller, `from_ai_handoff`, the exact original question, reason |
+| Handoff after the model declined | Reason and the articles it checked; no prompt or article text |
+| Normal complaint | `from_ai_handoff` false, `ai_handoff` null |
+| Agent: queue, open, claim, reply, priority, resolve, close; escalate | Existing workflow, handoff flag kept |
+| Customer sees the agent's reply | Yes, status In progress |
+| Another customer opens it / lists tickets | 404 / sees nothing |
+| Someone else's token; `customer_id` in the body | 400, nothing about the other customer; owner is still the caller |
+| Garbage, tampered, forged-key or login token; expired token | 400 with a clear message, no ticket |
+| Handoff token used to log in | 401 |
+| Form rejected (422), then sent again | Token still works |
+| Same token twice; two separate handoffs; simultaneous duplicate | One ticket; two tickets; one ticket (unique index) |
+| No login; agent; admin | 401; 403; 403 |
+| What the token carries | Only question, status, reason, source titles, ids and times |
+
+Four Phase 5 tests in `test_ask.py` were updated because `/ai/ask` responses gained the
+`handoff_token` field (they compare the whole response).
+
+Manual end-to-end check (2026-09-22, Edge, real `llama3.2:3b`, scratch PostgreSQL, the test PDF):
+customer asked "What is the capital of France?" -> "I couldn't find enough information in the
+company's knowledge base to answer that accurately." with **Talk to Human Support**, and no
+ticket yet; the complaint form opened prefilled; ticket #1 was created and shown as Open with the
+original question; the agent saw it in the Unassigned queue marked "AI handoff", opened it, saw
+the context, claimed it and replied (In progress); the customer saw the reply; the agent resolved
+it. "Can I get my money back after 20 days?" never created a ticket; it was answered 3 of 3 times
+in the browser, and once (in an earlier run) withheld by the number check because the model wrote
+"10 days" (30 - 20). 0 console errors; the ticket page fits at 390 px.
 
 ## Manual tests still to do
 

@@ -9,7 +9,7 @@ The model only ever writes from retrieved company text. Whenever that is not pos
 the same honest "not enough information" reply and no sources.
 """
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 
 from sqlalchemy.orm import Session
@@ -21,7 +21,7 @@ from app.services.search_service import SearchOutcome, SearchScope, SearchUnavai
 logger = logging.getLogger(__name__)
 
 NOT_ENOUGH_INFORMATION_REPLY = (
-    "I couldn't find the answer to that in our help articles, so I can't answer it reliably."
+    "I couldn't find enough information in the company's knowledge base to answer that accurately."
 )
 
 
@@ -48,6 +48,9 @@ class Answer:
     sources: list[Source]
     model: str | None  # None when the model was not asked at all
     reason: str        # why this outcome; for logs and tests, not shown to customers
+    # Articles the model read but could not answer from. For a human agent after a
+    # handoff; never shown to the customer as the source of an answer.
+    considered_sources: list[Source] = field(default_factory=list)
 
 
 def answer_question(db: Session, question: str, scope: SearchScope) -> Answer:
@@ -72,17 +75,18 @@ def answer_question(db: Session, question: str, scope: SearchScope) -> Answer:
         raise AssistantUnavailable(f"model failed: {error}") from error
 
     # 4. Only a reply that stays within the given text is passed on.
+    sources = [Source(c.document_title, c.chunk_index, c.similarity) for c in context]
     if rag_prompt.is_refusal(reply.text):
-        return _not_enough("MODEL_DECLINED", reply.model)
+        return _not_enough("MODEL_DECLINED", reply.model, sources)
     unsupported = rag_prompt.unsupported_numbers(reply.text, messages[1]["content"])
     if unsupported:
         logger.warning("Answer rejected: numbers %s are not in the knowledge or question", unsupported)
-        return _not_enough("UNSUPPORTED_NUMBERS", reply.model)
+        return _not_enough("UNSUPPORTED_NUMBERS", reply.model, sources)
 
-    sources = [Source(c.document_title, c.chunk_index, c.similarity) for c in context]
     return Answer(AnswerStatus.ANSWERED, reply.text, sources, reply.model, "ANSWERED")
 
 
-def _not_enough(reason: str, model: str | None = None) -> Answer:
+def _not_enough(reason: str, model: str | None = None, considered: list[Source] | None = None) -> Answer:
     logger.info("No answer given (%s)", reason)
-    return Answer(AnswerStatus.NOT_ENOUGH_INFORMATION, NOT_ENOUGH_INFORMATION_REPLY, [], model, reason)
+    return Answer(AnswerStatus.NOT_ENOUGH_INFORMATION, NOT_ENOUGH_INFORMATION_REPLY, [], model, reason,
+                  considered or [])

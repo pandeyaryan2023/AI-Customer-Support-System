@@ -1,7 +1,8 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String, Text
+from sqlalchemy import JSON, DateTime, Enum, ForeignKey, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base, utcnow
@@ -39,6 +40,12 @@ class Ticket(Base):
     assigned_agent_id: Mapped[Optional[int]] = mapped_column(ForeignKey("agents.id"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    # Set only when the customer chose human support after the AI assistant could not answer.
+    # handoff_id is unique, so submitting the same handoff twice cannot create a second ticket.
+    # ai_handoff is what the agent needs: the original question, why the AI stopped and which
+    # articles it looked at. Never the prompt or the article text.
+    handoff_id: Mapped[Optional[str]] = mapped_column(String(32), unique=True, index=True)
+    ai_handoff: Mapped[Optional[dict]] = mapped_column(JSON().with_variant(JSONB(), "postgresql"))
 
     category: Mapped[Optional[Category]] = relationship()
     customer: Mapped[User] = relationship()

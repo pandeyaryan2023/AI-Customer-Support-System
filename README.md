@@ -10,12 +10,13 @@ BCA-507 Minor Project. Customers raise complaints, support agents resolve them, 
 | Backend: FastAPI + PostgreSQL + SQLAlchemy + Alembic | Done |
 | Authentication (bcrypt + JWT) and role-based access | Done |
 | Core ticket management (customer / agent / admin APIs) | Done |
-| Automated tests (pytest) | 261 passing, plus 20 opt-in tests against the real model (see [docs/test-cases.md](docs/test-cases.md)) |
+| Automated tests (pytest) | 284 passing, plus 20 opt-in tests against the real model (see [docs/test-cases.md](docs/test-cases.md)) |
 | Knowledge base: document upload, storage, list, delete | Done (Phase 1) — no AI yet |
 | Knowledge base: text extraction from PDF (pypdf) and UTF-8 text | Done (Phase 2) |
 | Knowledge base: text cleaning, chunking, local embeddings (Ollama `nomic-embed-text`) | Done (Phase 3) |
 | Semantic search: cosine similarity over stored embeddings (admin test endpoint) | Done (Phase 4) |
-| AI answers (RAG) with local `llama3.2:3b`, grounded in the knowledge base; customer "Ask support" | Done (Phase 5) — no human handoff yet |
+| AI answers (RAG) with local `llama3.2:3b`, grounded in the knowledge base; customer "Ask support" | Done (Phase 5) |
+| Human handoff: "Talk to Human Support" turns an unanswered question into a normal ticket with its AI context | Done (Phase 6) |
 | Frontend (HTML / CSS / JavaScript) | Done — customer, agent and admin interfaces, with a token-based design system ([docs/design-system.md](docs/design-system.md)) |
 | AI ticket analysis and response assistance | Not started |
 | AWS and Amazon Connect | Not started |

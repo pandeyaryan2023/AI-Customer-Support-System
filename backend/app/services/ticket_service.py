@@ -1,10 +1,13 @@
 from fastapi import HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database.base import utcnow
 from app.models import Agent, Category, Priority, Role, Ticket, TicketMessage, TicketStatus, User
 from app.schemas.ticket import EscalateRequest, TicketCreate, TicketUpdate
+from app.services import handoff_service
+from app.services.handoff_service import HandoffError
 
 # Which status changes are allowed from each status.
 ALLOWED_TRANSITIONS: dict[TicketStatus, set[TicketStatus]] = {
@@ -92,6 +95,12 @@ def _change_status(ticket: Ticket, new_status: TicketStatus) -> None:
 # ---------- operations ----------
 
 def create_ticket(db: Session, customer: User, data: TicketCreate) -> Ticket:
+    # The owner is always the signed-in customer; the request never decides it.
+    handoff = _read_handoff(data.handoff_token, customer) if data.handoff_token else None
+    if handoff is not None:
+        existing = _ticket_for_handoff(db, handoff.handoff_id)
+        if existing is not None:
+            return existing  # the same handoff sent twice (double click, retry): one ticket
     if data.category_id is not None:
         _check_category(db, data.category_id)
     ticket = Ticket(
@@ -99,11 +108,33 @@ def create_ticket(db: Session, customer: User, data: TicketCreate) -> Ticket:
         description=data.description,
         category_id=data.category_id,
         customer_id=customer.id,
+        handoff_id=handoff.handoff_id if handoff else None,
+        ai_handoff=handoff.ticket_context() if handoff else None,
     )
     db.add(ticket)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Two copies of one handoff arrived at the same moment: the unique handoff_id let
+        # only one in. Return that one instead of failing.
+        db.rollback()
+        existing = _ticket_for_handoff(db, handoff.handoff_id) if handoff else None
+        if existing is None:
+            raise
+        return existing
     db.refresh(ticket)
     return ticket
+
+
+def _read_handoff(token: str, customer: User) -> handoff_service.Handoff:
+    try:
+        return handoff_service.read_token(token, customer)
+    except HandoffError as error:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(error)) from error
+
+
+def _ticket_for_handoff(db: Session, handoff_id: str) -> Ticket | None:
+    return db.scalar(select(Ticket).where(Ticket.handoff_id == handoff_id))
 
 
 def list_tickets(

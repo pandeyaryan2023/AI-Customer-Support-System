@@ -29,3 +29,6 @@ class AskOut(BaseModel):
     answer: str
     sources: list[SourceOut]  # empty unless ANSWERED
     model: Optional[str]      # the model that wrote the answer; null if none was asked
+    # Only when NOT_ENOUGH_INFORMATION: send it with a new ticket (POST /tickets) to hand
+    # the question to a human. Signed by the server, tied to this customer, short-lived.
+    handoff_token: Optional[str] = None

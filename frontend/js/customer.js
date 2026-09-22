@@ -30,7 +30,7 @@ async function loadCategories() {
 }
 
 function newComplaintButton() {
-  return h("button", { class: "btn", type: "button", onclick: openComplaintSheet },
+  return h("button", { class: "btn", type: "button", onclick: () => openComplaintSheet() },
     icon("plus"), "Raise a complaint");
 }
 
@@ -140,7 +140,10 @@ function renderTickets() {
 
 /* ---------------------------------------------------------- raise a complaint */
 
-function openComplaintSheet() {
+/* The one complaint form. "Talk to Human Support" opens it too: prefilled from the question
+   the assistant could not answer, and sending the handoff token so the team sees that context. */
+function openComplaintSheet({ question = "", handoffToken = null } = {}) {
+  const fromAssistant = Boolean(handoffToken);
   const title = h("input", { type: "text", minlength: "5", maxlength: "200",
     placeholder: "e.g. Charged twice for the same order", required: true });
   const category = h("select", {}, option("", "Not sure / other"),
@@ -148,9 +151,16 @@ function openComplaintSheet() {
   const description = h("textarea", { minlength: "10", maxlength: "5000",
     placeholder: "What happened? Include any order or reference numbers.", required: true });
 
+  if (fromAssistant) {
+    title.value = complaintTitleFrom(question);
+    description.value = `I asked the support assistant: "${question}"\n\n`;
+  }
+
   const submit = h("button", { class: "btn", type: "submit", form: "complaint-form" }, "Submit complaint");
 
   const form = h("form", { id: "complaint-form" },
+    fromAssistant ? h("p", { class: "meta handoff-note" }, icon("info"),
+      "Your question and what the assistant found are attached, so our team sees them straight away.") : null,
     field("Title", title, { hint: "A short summary — at least 5 characters." }),
     field("Category", category, { hint: "Optional. It helps us route your complaint faster." }),
     field("What went wrong", description, { hint: "At least 10 characters." }));
@@ -164,16 +174,19 @@ function openComplaintSheet() {
           title: title.value,
           description: description.value,
           category_id: category.value ? Number(category.value) : null,
+          handoff_token: handoffToken || undefined,
         },
       });
       closeSheet();
+      // From the assistant: open the new ticket, which shows its number and status.
+      if (fromAssistant) { location.href = `ticket.html?id=${ticket.id}`; return; }
       toast(`Complaint #${ticket.id} submitted. We'll be in touch.`, "success");
       render(currentView());
     });
   });
 
   openSheet({
-    title: "Raise a complaint",
+    title: fromAssistant ? "Talk to human support" : "Raise a complaint",
     body: form,
     footer: [h("button", { class: "btn btn-secondary", type: "button", onclick: closeSheet }, "Cancel"), submit],
   });
@@ -214,7 +227,7 @@ function renderAsk() {
     setLoading(submit, true);
     try {
       const reply = await api("/ai/ask", { method: "POST", json: { question: text } });
-      result.replaceChildren(reply.status === "ANSWERED" ? answerCard(reply) : notFoundCard(reply));
+      result.replaceChildren(reply.status === "ANSWERED" ? answerCard(reply) : notFoundCard(reply, text));
     } catch (error) {
       result.replaceChildren(h("section", { class: "card" }, emptyState({
         icon: "alert", title: "The assistant is unavailable right now", text: error.message })));
@@ -253,10 +266,23 @@ function answerCard(reply) {
       "This answer was written by AI from the sources above. If something looks wrong, contact our support team."));
 }
 
-function notFoundCard(reply) {
+/* Nothing is created here: the customer decides whether to hand the question to a person. */
+function notFoundCard(reply, question) {
+  const talk = reply.handoff_token
+    ? h("button", { class: "btn", type: "button",
+        onclick: () => openComplaintSheet({ question, handoffToken: reply.handoff_token }) },
+        icon("headset"), "Talk to Human Support")
+    : null;
   return h("section", { class: "card", "aria-live": "polite" }, emptyState({
     icon: "search",
     title: "Our help articles don't cover this",
-    text: `${reply.answer} Try rephrasing your question, or raise a complaint from My complaints so our team can help.`,
+    text: talk ? `${reply.answer} Our support team can help you with it.` : `${reply.answer} Try rephrasing your question.`,
+    action: talk,
   }));
+}
+
+function complaintTitleFrom(question) {
+  const text = question.replace(/\s+/g, " ").trim();
+  if (text.length < 5) return `Question: ${text}`;  // titles need at least 5 characters
+  return text.length <= 200 ? text : `${text.slice(0, 197)}…`;
 }

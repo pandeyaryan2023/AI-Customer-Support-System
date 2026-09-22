@@ -105,6 +105,7 @@ def test_answerable_question(client, customer, knowledge_base, ollama):
         "answer": "Yes. You can request a refund within 30 days of purchase, and 20 days is within that.",
         "sources": [{"document_title": "Support policy", "chunk_index": 0, "similarity": 0.9091}],
         "model": "llama3.2:3b",
+        "handoff_token": None,  # an answered question offers no handoff
     }
     for internal in ("embedding", "stored_filename", "storage", "Rules:", "<knowledge>", "search_query"):
         assert internal not in response.text  # no vectors, paths or prompt text leak out
@@ -115,6 +116,7 @@ def test_answerable_question(client, customer, knowledge_base, ollama):
 def test_no_match_gives_not_enough_information(client, customer, knowledge_base, ollama):
     fake = ollama(question_vector=vector(other=1))  # unrelated to every chunk
     body = ask(client, customer, "What is the capital of France?").json()
+    assert body.pop("handoff_token")  # Phase 6: the customer may hand this to a human
     assert body == {"status": "NOT_ENOUGH_INFORMATION", "answer": NOT_ENOUGH_INFORMATION_REPLY,
                     "sources": [], "model": None}
     assert fake.chats == []  # the model was never called
@@ -230,6 +232,7 @@ def test_answer_with_invented_numbers_is_not_trusted(client, customer, knowledge
     # nowhere in the knowledge or the question stops the answer from reaching the customer.
     ollama(reply="Good news: refunds are unlimited, you can get one up to 365 days after purchase.")
     body = ask(client, customer).json()
+    assert body.pop("handoff_token")
     assert body == {"status": "NOT_ENOUGH_INFORMATION", "answer": NOT_ENOUGH_INFORMATION_REPLY,
                     "sources": [], "model": "llama3.2:3b"}
 
@@ -287,6 +290,7 @@ def test_several_chunks_reach_the_model_in_rank_order(client, customer, knowledg
 def test_model_declining_gives_not_enough_information(client, customer, knowledge_base, ollama):
     ollama(reply="I don't have enough information to answer that.")
     body = ask(client, customer).json()
+    assert body.pop("handoff_token")
     assert body == {"status": "NOT_ENOUGH_INFORMATION", "answer": NOT_ENOUGH_INFORMATION_REPLY,
                     "sources": [], "model": "llama3.2:3b"}
 

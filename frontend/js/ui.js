@@ -436,7 +436,8 @@ function ticketTable(tickets, { showCustomer = false, showAgent = false, action 
       h("a", { href: `ticket.html?id=${ticket.id}` }, ticket.title),
       h("span", { class: "meta" },
         h("span", { class: "tnum" }, `#${ticket.id}`),
-        ticket.category ? ` · ${ticket.category.name}` : "")),
+        ticket.category ? ` · ${ticket.category.name}` : "",
+        ticket.from_ai_handoff ? h("span", { class: "badge badge-plain ai-label handoff-badge" }, "AI handoff") : null)),
     showCustomer ? h("td", {}, identity(ticket.customer.full_name)) : null,
     showAgent ? h("td", {},
       ticket.assigned_agent

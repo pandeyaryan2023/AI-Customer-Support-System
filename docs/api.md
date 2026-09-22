@@ -22,7 +22,7 @@ Authenticated endpoints need the header `Authorization: Bearer <token>`.
 
 | Method | Path | Who | Purpose |
 |---|---|---|---|
-| POST | `/tickets` | customer | Create a complaint |
+| POST | `/tickets` | customer | Create a complaint (optionally from an AI handoff, see below) |
 | GET | `/tickets` | any | List tickets visible to you. Filters: `status`, `priority`, `unassigned=true` |
 | GET | `/tickets/{id}` | owner / assigned agent / unassigned (agents) / admin | Details with messages |
 | POST | `/tickets/{id}/messages` | ticket owner, assigned agent, admin | Send a message |
@@ -121,6 +121,19 @@ retrieved knowledge or the question. Retrieved text is treated as data: sentence
 the AI ("ignore previous instructions", "note for the assistant", "SYSTEM:"...) are removed
 before the model sees it. If search or the model is unavailable the response is **503** with a
 generic message; the real reason is only written to the server log.
+
+A `NOT_ENOUGH_INFORMATION` reply to a customer also carries a `handoff_token`. Nothing is
+stored and no ticket is created unless the customer chooses "Talk to Human Support", which
+sends the normal `POST /tickets` body plus `"handoff_token": "..."`. The token is signed by the
+server (audience `ai-handoff`, so it can never be used to log in), tied to the customer who
+asked, and valid for `handoff_token_expire_minutes` = 60. The ticket's AI context is taken from
+the token, never from the form. A token that is forged, tampered with, expired or someone
+else's gives **400** and creates nothing. Sending the same token twice returns the same ticket
+(one ticket per handoff, enforced by a unique index).
+
+Every ticket response now has `from_ai_handoff` (true / false) and `ai_handoff` (null, or
+`question`, `ai_status`, `reason`, `sources` [title, chunk_index, similarity], `asked_at`).
+It never contains the prompt or article text.
 
 ## Status change rules
 

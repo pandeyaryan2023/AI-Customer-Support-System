@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     llm_max_answer_tokens: int = 200   # answers are asked to be 1-3 sentences; this is a hard cap
     llm_temperature: float = 0.0       # always pick the most likely words: no creative variation
 
+    # Human handoff: how long "Talk to Human Support" stays valid after the AI could not answer.
+    handoff_token_expire_minutes: int = 60
+
     model_config = SettingsConfigDict(env_file=ENV_FILE, env_file_encoding="utf-8")
 
     @property

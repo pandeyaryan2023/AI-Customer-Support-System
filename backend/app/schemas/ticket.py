@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated, Optional
 
-from pydantic import BaseModel, ConfigDict, StringConstraints, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, computed_field, model_validator
 
 from app.models.enums import Priority, TicketStatus
 from app.schemas.category import CategoryOut
@@ -17,6 +17,9 @@ class TicketCreate(BaseModel):
     title: Title
     description: Description
     category_id: Optional[int] = None
+    # Set by "Talk to Human Support" after the AI assistant could not answer (POST /ai/ask).
+    # The server checks it and takes the AI context from it, never from the form.
+    handoff_token: Optional[str] = Field(default=None, max_length=8192)
 
 
 class TicketUpdate(BaseModel):
@@ -52,6 +55,22 @@ class MessageOut(BaseModel):
     created_at: datetime
 
 
+class AIHandoffSource(BaseModel):
+    document_title: str
+    chunk_index: int
+    similarity: float
+
+
+class AIHandoffOut(BaseModel):
+    """What the AI assistant knew when the customer asked for a human."""
+
+    question: str                 # exactly what the customer asked the assistant
+    ai_status: str                # e.g. NOT_ENOUGH_INFORMATION
+    reason: str                   # why the assistant stopped, in plain words
+    sources: list[AIHandoffSource]  # articles it looked at (no article text)
+    asked_at: datetime
+
+
 class TicketOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -65,6 +84,12 @@ class TicketOut(BaseModel):
     assigned_agent: Optional[AgentBrief]
     created_at: datetime
     updated_at: datetime
+    ai_handoff: Optional[AIHandoffOut] = None  # null unless raised through "Talk to Human Support"
+
+    @computed_field
+    @property
+    def from_ai_handoff(self) -> bool:
+        return self.ai_handoff is not None
 
 
 class TicketDetail(TicketOut):

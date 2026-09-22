@@ -1100,3 +1100,12 @@ tbody tr:hover .row-action,
 .source-item svg { width: 16px; height: 16px; color: var(--text-muted); flex: none; }
 .source-score { margin-left: auto; font-variant-numeric: tabular-nums; }
 .ask-note { margin-top: var(--s4); }
+
+/* ---------------------------------------------------------- AI handoff */
+
+.handoff-note { display: flex; align-items: flex-start; gap: var(--s2); margin-bottom: var(--s4); }
+.handoff-note svg { width: 14px; height: 14px; flex: none; margin-top: 2px; }
+.handoff { background: var(--accent-soft); }
+.handoff .source-item { background: var(--surface); }
+.handoff-question { font-weight: var(--fw-medium); }
+.handoff-badge { margin-left: var(--s2); padding: 1px 7px; }
