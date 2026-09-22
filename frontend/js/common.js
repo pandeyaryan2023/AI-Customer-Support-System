@@ -70,7 +70,7 @@ function errorText(data, status) {
 }
 
 /** Call the API. Adds the JWT automatically. Throws ApiError with a readable message. */
-async function api(path, { method = "GET", json, form } = {}) {
+async function api(path, { method = "GET", json, form, upload } = {}) {
   const headers = {};
   const session = getSession();
   if (session) headers.Authorization = `Bearer ${session.token}`;
@@ -81,6 +81,10 @@ async function api(path, { method = "GET", json, form } = {}) {
     body = JSON.stringify(json);
   } else if (form) {
     body = new URLSearchParams(form); // login expects form fields, not JSON
+  } else if (upload) {
+    // A FormData body carrying files. Deliberately NO Content-Type header: the browser
+    // writes "multipart/form-data; boundary=..." itself, matching the body it builds.
+    body = upload;
   }
 
   let response;

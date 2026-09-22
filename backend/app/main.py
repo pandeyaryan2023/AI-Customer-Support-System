@@ -6,7 +6,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
-from app.api import admin, agents, auth, categories, tickets
+from app.api import admin, agents, auth, categories, documents, tickets
 from app.api.deps import DbSession
 from app.core.config import settings
 
@@ -28,6 +28,7 @@ app.include_router(tickets.router)
 app.include_router(categories.router)
 app.include_router(agents.router)
 app.include_router(admin.router)
+app.include_router(documents.router)
 
 # The web interface (plain HTML/CSS/JS) is served from the same server at /app/,
 # so the browser and the API share one origin.

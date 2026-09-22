@@ -227,7 +227,8 @@ a:hover { color: var(--accent-hover); }
   pointer-events: none;
   transition: opacity var(--t-base) var(--ease);
 }
-body.drawer-open .scrim { opacity: 1; pointer-events: auto; }
+body.drawer-open .scrim,
+.scrim.is-open { opacity: 1; pointer-events: auto; }
 
 /* ---------------------------------------------------------- buttons */
 
@@ -373,6 +374,34 @@ select {
   background-size: 16px;
 }
 
+/* File picker: a dashed drop area with the native button restyled to match .btn-secondary. */
+input[type="file"] {
+  width: 100%;
+  padding: 6px;
+  font-family: inherit;
+  font-size: var(--fs-label);
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: border-color var(--t-fast) var(--ease);
+}
+input[type="file"]:hover { border-color: var(--text-muted); }
+input[type="file"]::file-selector-button {
+  height: 30px;
+  margin-right: var(--s3);
+  padding: 0 var(--s3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--fs-label);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+
 .checkbox { display: inline-flex; align-items: center; gap: var(--s2); font-size: var(--fs-body); cursor: pointer; }
 .checkbox input { width: 16px; height: 16px; min-height: 0; accent-color: var(--accent); cursor: pointer; }
 
@@ -424,6 +453,7 @@ select {
 
 .state-active { background: var(--green-bg); color: var(--green-fg); }
 .state-disabled { background: var(--slate-bg); color: var(--slate-fg); }
+.badge-neutral { background: var(--slate-bg); color: var(--slate-fg); }
 
 .role-CUSTOMER { background: var(--slate-bg); color: var(--slate-fg); }
 .role-AGENT { background: var(--blue-bg); color: var(--blue-fg); }

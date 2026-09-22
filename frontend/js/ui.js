@@ -42,6 +42,8 @@ const ICON_PATHS = {
   message: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z",
   search: "M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3",
   folder: "M3 7a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z",
+  file: "M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6",
+  upload: "M12 15V3M7 8l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4",
   shield: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z",
 };
 
@@ -97,6 +99,13 @@ function fmtAgo(iso) {
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
   if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
   return fmtDay(iso);
+}
+
+/** 2048 -> "2.0 KB", 1572864 -> "1.5 MB". */
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function labelOf(value) {
@@ -204,6 +213,7 @@ const NAV = {
     { id: "users", label: "Users", icon: "users" },
     { id: "agents", label: "Agents", icon: "headset" },
     { id: "categories", label: "Categories", icon: "tags" },
+    { id: "documents", label: "Knowledge base", icon: "file" },
   ],
 };
 
@@ -344,10 +354,11 @@ function openSheet({ title, body, footer }) {
     h("div", { class: "sheet-body" }, body),
     footer ? h("div", { class: "sheet-foot" }, footer) : null);
 
+  // The sheet has its own scrim. It must NOT set body.drawer-open: that class is what
+  // slides the navigation drawer in on phones, so it would open behind the sheet.
   const scrim = h("div", { class: "scrim", onclick: () => closeSheet() });
   document.body.append(scrim, panel);
   requestAnimationFrame(() => scrim.classList.add("is-open"));
-  document.body.classList.add("drawer-open");
 
   const focusable = panel.querySelector("input, textarea, select, button");
   if (focusable) focusable.focus();
@@ -368,7 +379,6 @@ function closeSheet() {
   document.removeEventListener("keydown", onKey);
   panel.remove();
   scrim.remove();
-  document.body.classList.remove("drawer-open");
   if (opener && opener.focus) opener.focus();
 }
 

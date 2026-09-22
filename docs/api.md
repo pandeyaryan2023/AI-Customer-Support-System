@@ -43,6 +43,20 @@ Authenticated endpoints need the header `Authorization: Bearer <token>`.
 | PATCH | `/admin/categories/{id}` | admin | Rename, describe, activate / deactivate |
 | GET | `/admin/stats` | admin | Ticket, priority and user counts |
 
+## Knowledge base
+
+| Method | Path | Who | Purpose |
+|---|---|---|---|
+| POST | `/admin/documents` | admin | Upload a document. `multipart/form-data` with `title` and `file` |
+| GET | `/admin/documents` | admin | List documents, newest first |
+| DELETE | `/admin/documents/{id}` | admin | Remove the document and its file (204) |
+
+Upload rules: `.pdf` or `.txt` only (415 otherwise); the bytes must match the extension —
+a PDF must start with `%PDF-`, text must be UTF-8 (415); not empty (400); at most
+`max_upload_mb`, default 10 MB (413); title 2–200 characters (422).
+The uploader's filename is kept for display only; the file is saved under a generated name.
+`DELETE` exists for documents only: an outdated policy must stop being used as a source.
+
 ## Status change rules
 
 ```

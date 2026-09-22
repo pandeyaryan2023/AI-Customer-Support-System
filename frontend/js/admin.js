@@ -1,7 +1,6 @@
 "use strict";
 
-/* Administration workspace. Five views, one per sidebar item.
-   Every call here is one the previous admin page already made. */
+/* Administration workspace. Six views, one per sidebar item. */
 
 const session = requireRole("ADMIN");
 let shell = null;
@@ -12,6 +11,7 @@ const VIEWS = {
   users: renderUsers,
   agents: renderAgents,
   categories: renderCategories,
+  documents: renderDocuments,
 };
 
 if (session) init();
@@ -326,6 +326,113 @@ function openCategorySheet(onDone) {
 
   openSheet({
     title: "Add a category",
+    body: form,
+    footer: [h("button", { class: "btn btn-secondary", type: "button", onclick: closeSheet }, "Cancel"), submit],
+  });
+}
+
+/* ---------------------------------------------------------- knowledge base */
+
+// Mirrors the backend's max_upload_mb and allow-list. These checks only save the admin
+// a slow, doomed upload — the server re-checks everything and is the real authority.
+const MAX_UPLOAD_MB = 10;
+const UPLOAD_TYPES = { ".pdf": "PDF", ".txt": "Text" };
+
+function extensionOf(filename) {
+  const dot = filename.lastIndexOf(".");
+  return dot === -1 ? "" : filename.slice(dot).toLowerCase();
+}
+
+function renderDocuments() {
+  const addButton = h("button", { class: "btn", type: "button", onclick: () => openDocumentSheet(load) },
+    icon("upload"), "Upload document");
+  shell.setHeader("Knowledge base", {
+    subtitle: "Policies and guides that support answers are based on.",
+    actions: [addButton],
+  });
+
+  const results = h("div", {});
+  shell.body.replaceChildren(h("section", { class: "card" }, results));
+
+  function load() {
+    return loadInto(results, skeletonRows(4), async () => {
+      const documents = await api("/admin/documents");
+      shell.setNavCount("documents", documents.length || "");
+
+      const rows = documents.map((doc) => {
+        const remove = h("button", { class: "btn btn-sm btn-danger", type: "button" }, "Delete");
+        remove.addEventListener("click", () => {
+          if (!confirm(`Delete "${doc.title}"? The file is removed permanently.`)) return;
+          guarded(remove, async () => {
+            await api(`/admin/documents/${doc.id}`, { method: "DELETE" });
+            toast(`${doc.title} deleted.`, "success");
+            await load();
+          });
+        });
+
+        return h("tr", {},
+          h("td", { class: "cell-subject" },
+            h("span", { class: "strong", style: "display:block" }, doc.title),
+            h("span", { class: "meta" }, doc.original_filename)),
+          h("td", {}, h("span", { class: "badge badge-plain badge-neutral" },
+            UPLOAD_TYPES[extensionOf(doc.original_filename)] || doc.content_type)),
+          h("td", { class: "col-num" }, formatBytes(doc.size_bytes)),
+          h("td", {}, identity(doc.uploaded_by.full_name)),
+          h("td", { class: "meta" }, fmtDay(doc.created_at)),
+          h("td", { class: "col-actions" }, h("span", { class: "row-action" }, remove)));
+      });
+
+      return tableOrEmpty(rows,
+        ["Document", "Type", "Size", "Uploaded by", "Added", { label: "", align: "right" }],
+        emptyState({
+          icon: "file",
+          title: "No documents yet",
+          text: "Upload the policies your support team works from — refunds, shipping, warranty and product guides.",
+          action: h("button", { class: "btn", type: "button", onclick: () => openDocumentSheet(load) },
+            "Upload document"),
+        }));
+    });
+  }
+  load();
+}
+
+function openDocumentSheet(onDone) {
+  const title = h("input", { type: "text", minlength: "2", maxlength: "200",
+    placeholder: "Refund policy", required: true });
+  const fileInput = h("input", { type: "file", accept: ".pdf,.txt,application/pdf,text/plain", required: true });
+  const submit = h("button", { class: "btn", type: "submit", form: "document-form" }, "Upload");
+
+  // Picking a file fills in an empty title from its name, which is usually what you want.
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files[0];
+    if (file && !title.value.trim()) title.value = file.name.replace(/\.[^.]+$/, "");
+  });
+
+  const form = h("form", { id: "document-form" },
+    field("File", fileInput, { hint: `PDF or plain-text file, up to ${MAX_UPLOAD_MB} MB.` }),
+    field("Title", title, { hint: "How the document appears in the knowledge base." }));
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const file = fileInput.files[0];
+    if (!file) { notify("Choose a file to upload."); return; }
+    if (!UPLOAD_TYPES[extensionOf(file.name)]) { notify("Only PDF and .txt files can be uploaded."); return; }
+    if (file.size > MAX_UPLOAD_MB * 1024 * 1024) { notify(`That file is over the ${MAX_UPLOAD_MB} MB limit.`); return; }
+
+    const body = new FormData();
+    body.append("title", title.value);
+    body.append("file", file);
+
+    guarded(submit, async () => {
+      const doc = await api("/admin/documents", { method: "POST", upload: body });
+      closeSheet();
+      toast(`${doc.title} added to the knowledge base.`, "success");
+      onDone();
+    });
+  });
+
+  openSheet({
+    title: "Upload a document",
     body: form,
     footer: [h("button", { class: "btn btn-secondary", type: "button", onclick: closeSheet }, "Cancel"), submit],
   });

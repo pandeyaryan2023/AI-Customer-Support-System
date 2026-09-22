@@ -3,7 +3,8 @@ from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # backend/.env  (config.py is backend/app/core/config.py)
-ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+ENV_FILE = BACKEND_DIR / ".env"
 
 
 class Settings(BaseSettings):
@@ -17,6 +18,10 @@ class Settings(BaseSettings):
         "http://localhost:5500,http://127.0.0.1:5500,"
         "http://localhost:8000,http://127.0.0.1:8000"
     )
+
+    # Knowledge-base uploads. Kept OUTSIDE frontend/, which is publicly served at /app/.
+    storage_dir: Path = BACKEND_DIR / "storage" / "documents"
+    max_upload_mb: int = 10
 
     model_config = SettingsConfigDict(env_file=ENV_FILE, env_file_encoding="utf-8")
 

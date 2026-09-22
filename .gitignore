@@ -10,5 +10,8 @@ venv/
 # Prototype data file (created when you run the app)
 python-prototype/complaints.json
 
+# Uploaded knowledge-base documents (business data, never committed)
+backend/storage/
+
 # Editor
 .vscode/

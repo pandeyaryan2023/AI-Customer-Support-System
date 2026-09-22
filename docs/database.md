@@ -1,6 +1,7 @@
 # Database design
 
-PostgreSQL, accessed through SQLAlchemy, created by Alembic migration `0001_create_core_tables`.
+PostgreSQL, accessed through SQLAlchemy, created by Alembic migrations
+`0001_create_core_tables` and `0002_add_documents_table`.
 
 ## Tables
 
@@ -11,6 +12,7 @@ PostgreSQL, accessed through SQLAlchemy, created by Alembic migration `0001_crea
 | `categories` | Complaint categories managed by the admin | `id` PK, `name` (unique), `is_active` |
 | `tickets` | Customer complaints | `id` PK, `customer_id` FK -> users, `assigned_agent_id` FK -> agents (nullable), `category_id` FK -> categories (nullable), `status`, `priority` |
 | `ticket_messages` | Conversation on a ticket | `id` PK, `ticket_id` FK -> tickets, `sender_id` FK -> users, `message` |
+| `documents` | Knowledge-base files (the bytes are on disk, not in the database) | `id` PK, `title`, `original_filename` (display only), `stored_filename` (unique, generated), `content_type`, `size_bytes`, `uploaded_by_id` FK -> users |
 
 ## Relationships
 
@@ -19,6 +21,11 @@ PostgreSQL, accessed through SQLAlchemy, created by Alembic migration `0001_crea
 - A ticket **belongs to** at most one category. `tickets.category_id -> categories.id`
 - A ticket **has** many messages, each **sent by** one user.
 - A user **may have** one agent profile (only when their role is AGENT).
+- An admin **uploads** many documents. `documents.uploaded_by_id -> users.id`
+
+Uploaded files are stored in `backend/storage/documents/` under a random name
+(`stored_filename`), never under the uploader's filename. That folder is outside
+`frontend/`, so it is not publicly served, and it is excluded from Git.
 
 ## Enumerated values (stored as text)
 

@@ -80,6 +80,27 @@ The table below lists the original fourteen cases; all still pass.
 | Stats | Correct totals |
 | Admin reads any ticket | 200 |
 
+## Knowledge base (`tests/test_documents.py`, 18 tests)
+
+| Case | Expected |
+|---|---|
+| Admin uploads a PDF | 201; file saved under a generated name; stored filename not exposed |
+| Admin uploads a UTF-8 text file | 201, `text/plain` |
+| List | Newest first |
+| Filenames `../../../etc/evil.pdf`, `..\..\windows\evil.pdf`, `C:\Users\...\refund.pdf` | Shown as the bare name; file stays inside the storage folder |
+| `virus.exe`, `invoice.pdf.exe` | 415, nothing saved |
+| Text file renamed `fake.pdf` | 415, nothing saved |
+| Binary content in a `.txt` | 415, nothing saved |
+| Empty file | 400, nothing saved |
+| File over the size limit | 413, nothing saved |
+| Title empty, blank, 1 character, 201 characters | 422 |
+| Customer or agent calls upload / list / delete; no token | 403; 401 |
+| Delete | 204; row and file removed; second delete 404 |
+
+Browser check of the Knowledge base screen (Edge, 2026-09-22): empty state, upload of a PDF
+and a text file, fake PDF rejected by the server, `.exe` blocked in the browser before any
+request, delete, no overflow at 390 px — all passed, 0 console errors.
+
 ## Manual tests still to do
 
 - Full flow in Swagger (`/docs`) against real PostgreSQL.
