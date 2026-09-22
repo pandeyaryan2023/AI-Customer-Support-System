@@ -40,6 +40,13 @@ class Settings(BaseSettings):
     search_top_k: int = 3
     search_similarity_threshold: float = 0.55
 
+    # Answer generation (RAG) with a local model through Ollama.
+    llm_model: str = "llama3.2:3b"
+    llm_timeout_seconds: float = 180   # a CPU-only machine can be slow, above all on the first call
+    llm_context_tokens: int = 4096     # room for the rules + up to 3 chunks of 500 words + the question
+    llm_max_answer_tokens: int = 200   # answers are asked to be 1-3 sentences; this is a hard cap
+    llm_temperature: float = 0.0       # always pick the most likely words: no creative variation
+
     model_config = SettingsConfigDict(env_file=ENV_FILE, env_file_encoding="utf-8")
 
     @property

@@ -98,6 +98,30 @@ and `results`: `chunk_id`, `document_id`, `document_title`, `chunk_index`, `text
 No vectors, stored filenames or paths are returned. If Ollama or the database is unavailable the
 response is **503** with the reason, never an empty result.
 
+## AI assistant
+
+| Method | Path | Who | Purpose |
+|---|---|---|---|
+| POST | `/ai/ask` | customer, admin | Answer a question from the knowledge base only |
+
+Body: `{"question": "Can I get a refund after 20 days?"}` (2–500 characters; any other field is
+rejected with 422, so a client cannot pass rules, context or a model). Response:
+
+```json
+{"status": "ANSWERED",
+ "answer": "You can request a refund within 30 days of purchase...",
+ "sources": [{"document_title": "Customer support knowledge base", "chunk_index": 0, "similarity": 0.656}],
+ "model": "llama3.2:3b"}
+```
+
+`status` is `ANSWERED` or `NOT_ENOUGH_INFORMATION` (a fixed reply, no sources). The second happens
+when search finds nothing relevant (the model is **not** called; `model` is null), when the
+model says it cannot answer, or when its answer contains a number that appears nowhere in the
+retrieved knowledge or the question. Retrieved text is treated as data: sentences addressed to
+the AI ("ignore previous instructions", "note for the assistant", "SYSTEM:"...) are removed
+before the model sees it. If search or the model is unavailable the response is **503** with a
+generic message; the real reason is only written to the server log.
+
 ## Status change rules
 
 ```

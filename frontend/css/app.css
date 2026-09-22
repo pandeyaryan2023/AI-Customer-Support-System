@@ -283,6 +283,8 @@ body.drawer-open .scrim,
 
 /* Button loading: the label stays for width, a spinner replaces it visually. */
 .btn.is-loading { color: transparent !important; pointer-events: none; }
+/* An icon would show through the spinner; hidden (not removed) so the button keeps its width. */
+.btn.is-loading svg { visibility: hidden; }
 .btn.is-loading::after {
   content: "";
   position: absolute;
@@ -1073,3 +1075,28 @@ tbody tr:hover .row-action,
   transition: top var(--t-base) var(--ease);
 }
 .skip-link:focus { top: var(--s4); }
+
+/* ---------------------------------------------------------- ask support */
+
+.ask { max-width: 760px; }
+.ask-actions { margin-top: var(--s4); justify-content: flex-end; }
+.ask-skeleton { display: grid; gap: var(--s2); margin-top: var(--s3); }
+/* A long label, so unlike other badges it may wrap on narrow screens. */
+.ai-label { background: var(--accent-soft); color: var(--accent-hover); white-space: normal; max-width: 100%; }
+.ai-label svg { width: 14px; height: 14px; }
+.ask-answer { margin-top: var(--s3); font-size: var(--fs-section); line-height: var(--lh-body); white-space: pre-wrap; overflow-wrap: anywhere; }
+.ask-sources-title { display: block; margin-top: var(--s5); color: var(--text-muted); }
+.source-list { list-style: none; margin: var(--s2) 0 0; padding: 0; display: grid; gap: var(--s2); }
+.source-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--canvas);
+}
+.source-item svg { width: 16px; height: 16px; color: var(--text-muted); flex: none; }
+.source-score { margin-left: auto; font-variant-numeric: tabular-nums; }
+.ask-note { margin-top: var(--s4); }

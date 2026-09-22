@@ -201,6 +201,7 @@ const NAV = {
   CUSTOMER: [
     { id: "dashboard", label: "Dashboard", icon: "dashboard" },
     { id: "tickets", label: "My complaints", icon: "ticket" },
+    { id: "ask", label: "Ask support", icon: "message" },
   ],
   AGENT: [
     { id: "dashboard", label: "Dashboard", icon: "dashboard" },

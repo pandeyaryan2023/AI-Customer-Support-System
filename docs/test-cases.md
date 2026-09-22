@@ -1,6 +1,6 @@
 # Test cases
 
-Automated tests: `cd backend; pytest`. Last run: **189 passed, 20 skipped** (2026-09-22), using
+Automated tests: `cd backend; pytest`. Last run: **261 passed, 20 skipped** (2026-09-22), using
 in-memory SQLite and a fake Ollama (`tests/conftest.py`), so no test needs Ollama running.
 The 20 skipped are the opt-in real-model tests (`RUN_OLLAMA_TESTS=1`): **20 passed** when run.
 Not yet covered by pytest: PostgreSQL-specific behaviour, AI, AWS (none built yet).
@@ -232,6 +232,61 @@ Manual check (2026-09-22, scratch PostgreSQL, real `nomic-embed-text`, the test 
 With one chunk per section the top chunk was the right section every time (0.664, 0.784, 0.781,
 0.828; France 0.425). A FAILED document was not searched, an unreachable Ollama gave
 SearchUnavailable, and each search took about 0.4–0.5 s. 9/9 checks passed.
+
+## LLM client (`tests/test_llm_client.py`, 13 tests)
+
+| Case | Expected |
+|---|---|
+| Reply; request body | Trimmed text, model, token counts; `llama3.2:3b`, not streamed, temperature 0, 4096 context, 200-token cap |
+| Ollama down; timeout; model not installed; other error | `LLMError` with a readable reason |
+| Not JSON, no message, wrong shape, no content, content not text; empty or blank reply | `LLMError` |
+
+## Prompt and answer checks (`tests/test_rag_prompt.py`, 29 tests)
+
+| Case | Expected |
+|---|---|
+| Messages | System = the fixed rules only; user = `<knowledge>` with labelled sources, then `<question>` |
+| Several chunks | Labelled Source 1, 2... in rank order |
+| Question or chunk containing `</question>`, `<knowledge>`... | Markers removed: only our own block markers remain |
+| 8 kinds of injected instruction in a chunk | Removed; the policy sentences around it kept word for word |
+| Ordinary policy sentences ("ignore the care instructions", "assistant manager"...) | Kept |
+| The test PDF's text | Unchanged |
+| Chunk made only of instructions; word budget | Left out; context stays within 1,800 words |
+| Exact refusal and paraphrases; real answers | Recognised as refusals; not refusals |
+| Invented numbers; numbers from the knowledge or question (9:00 vs 9, 1,000 vs 1000) | Caught; allowed |
+
+## Ask endpoint (`tests/test_ask.py`, 30 tests)
+
+| Case | Expected |
+|---|---|
+| Answerable question | `ANSWERED`, answer, one source with title / part / similarity, model; no prompt, vectors or paths in the response |
+| NO_MATCH; empty knowledge base; only FAILED documents | `NOT_ENOUGH_INFORMATION`, no sources, `model` null, **model never called** |
+| What the model receives | The rules as system message; the retrieved chunk and the question in their blocks; nothing below the threshold |
+| Sources | Same chunks and similarities as `/admin/documents/search` |
+| Model down, timeout, empty or malformed reply; search down | 503 with a generic message, no internal details |
+| Injection inside a document | Never reaches the model; the real policy does |
+| Reply with an invented number ("up to 365 days") | `NOT_ENOUGH_INFORMATION` |
+| Customer tries to override the rules or break out of the question block | Rules unchanged; attack text stays inside the question |
+| Extra fields (`system`, `context`, `model`, `top_k`); bad or missing question | 422 |
+| Three chunks retrieved | All three sent in rank order, three sources |
+| Model declines; chunk made only of instructions | `NOT_ENOUGH_INFORMATION`; model not called for the second |
+| Recorded reason | `NO_INDEXED_DOCUMENTS` / `NO_MATCH` |
+| Customer, admin, agent, no token | 200, 200, 403, 401 |
+
+Real check with `llama3.2:3b` (2026-09-22, scratch PostgreSQL, the test PDF):
+
+| Question | Status | Answer |
+|---|---|---|
+| Can I get my money back after 20 days? | ANSWERED | "You can request a refund within 30 days of purchase. Since you've purchased the product 20 days ago, you are still eligible for a refund." |
+| How long does shipping take? | ANSWERED | "Standard delivery usually takes 3 to 5 business days." |
+| When can I contact customer support? | ANSWERED | "Customer support is available Monday to Friday from 9:00 AM to 6:00 PM. ..." |
+| What is the capital of France? | NOT_ENOUGH_INFORMATION | model not called |
+| Do you offer gift cards? | NOT_ENOUGH_INFORMATION | model not called |
+| Can I get a refund after 45 days? | ANSWERED | "No, you can request a refund within 30 days of purchase." |
+
+Two customer override attempts and three questions against documents containing injected
+instructions produced no false answer ("Are refunds unlimited?" -> "No, refunds are only available
+within 30 days of purchase."). Browser (Edge): 9/9 checks, 0 console errors, 390 px layout.
 
 ## Manual tests still to do
 

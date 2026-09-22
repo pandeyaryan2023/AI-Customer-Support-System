@@ -1,7 +1,7 @@
 "use strict";
 
-/* Customer workspace: a dashboard summary and the full complaint list.
-   Both views read the same endpoint the old page used — GET /tickets. */
+/* Customer workspace: a dashboard summary, the full complaint list, and "Ask support",
+   which answers questions from the company's help articles (POST /ai/ask). */
 
 const session = requireRole("CUSTOMER");
 let shell = null;
@@ -18,7 +18,7 @@ function init() {
 
 function currentView() {
   const id = location.hash.replace("#/", "");
-  return id === "tickets" ? "tickets" : "dashboard";
+  return ["tickets", "ask"].includes(id) ? id : "dashboard";
 }
 
 async function loadCategories() {
@@ -37,6 +37,7 @@ function newComplaintButton() {
 function render(view) {
   shell.setActive(view);
   if (view === "tickets") renderTickets();
+  else if (view === "ask") renderAsk();
   else renderDashboard();
 }
 
@@ -176,4 +177,86 @@ function openComplaintSheet() {
     body: form,
     footer: [h("button", { class: "btn btn-secondary", type: "button", onclick: closeSheet }, "Cancel"), submit],
   });
+}
+
+/* ---------------------------------------------------------- ask support */
+
+function renderAsk() {
+  shell.setHeader("Ask support", {
+    subtitle: "Get an answer from our help articles, any time.",
+  });
+
+  const question = h("textarea", { id: "ask-question", minlength: "2", maxlength: "500", rows: "3",
+    placeholder: "e.g. Can I get my money back after 20 days?", required: true });
+  const submit = h("button", { class: "btn", type: "submit", form: "ask-form" }, icon("message"), "Ask");
+  const result = h("div", {});
+
+  const form = h("form", { id: "ask-form", class: "card card-pad" },
+    field("Your question", question, {
+      hint: "Answers come only from our help articles. It can take up to a minute.",
+    }),
+    h("div", { class: "row ask-actions" }, submit));
+
+  // Enter asks; Shift+Enter starts a new line.
+  question.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      form.requestSubmit();
+    }
+  });
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const text = question.value.trim();
+    if (text.length < 2) { notify("Type a question first."); return; }
+
+    result.replaceChildren(askLoading());
+    setLoading(submit, true);
+    try {
+      const reply = await api("/ai/ask", { method: "POST", json: { question: text } });
+      result.replaceChildren(reply.status === "ANSWERED" ? answerCard(reply) : notFoundCard(reply));
+    } catch (error) {
+      result.replaceChildren(h("section", { class: "card" }, emptyState({
+        icon: "alert", title: "The assistant is unavailable right now", text: error.message })));
+    } finally {
+      setLoading(submit, false);
+    }
+  });
+
+  shell.body.replaceChildren(h("div", { class: "stack ask" }, form, result));
+  question.focus();
+}
+
+function askLoading() {
+  return h("section", { class: "card card-pad", "aria-busy": "true" },
+    h("p", { class: "meta" }, "Searching our help articles and writing an answer…"),
+    h("div", { class: "ask-skeleton" },
+      h("span", { class: "skeleton sk-line", style: "width:92%" }),
+      h("span", { class: "skeleton sk-line", style: "width:78%" }),
+      h("span", { class: "skeleton sk-line", style: "width:54%" })));
+}
+
+function answerCard(reply) {
+  return h("section", { class: "card card-pad", "aria-live": "polite" },
+    h("span", { class: "badge badge-plain ai-label" }, icon("info"),
+      "AI-generated answer based on company knowledge"),
+    h("p", { class: "ask-answer" }, reply.answer),
+    h("h3", { class: "label ask-sources-title" }, "Sources"),
+    h("ul", { class: "source-list" }, reply.sources.map((source) =>
+      h("li", { class: "source-item" },
+        icon("file"),
+        h("span", { class: "strong" }, source.document_title),
+        h("span", { class: "meta" }, `Part ${source.chunk_index + 1}`),
+        h("span", { class: "meta source-score", title: "How closely this passage matched your question (0 to 1)" },
+          `Relevance ${source.similarity.toFixed(2)}`)))),
+    h("p", { class: "meta ask-note" },
+      "This answer was written by AI from the sources above. If something looks wrong, contact our support team."));
+}
+
+function notFoundCard(reply) {
+  return h("section", { class: "card", "aria-live": "polite" }, emptyState({
+    icon: "search",
+    title: "Our help articles don't cover this",
+    text: `${reply.answer} Try rephrasing your question, or raise a complaint from My complaints so our team can help.`,
+  }));
 }

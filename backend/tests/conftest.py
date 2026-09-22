@@ -31,10 +31,14 @@ class FakeOllama:
     Answers POST /api/embed like the real one: one vector of embedding_dimension numbers
     per input. The numbers are derived from the text, so the same text always gets the
     same vector, and different texts get different vectors.
+
+    Answers POST /api/chat with `chat_reply`, and records each conversation it was sent.
     """
 
     def __init__(self):
-        self.requests = []  # every JSON body "sent to Ollama", for tests to inspect
+        self.requests = []  # every embedding request "sent to Ollama", for tests to inspect
+        self.chats = []     # every chat request
+        self.chat_reply = "This is a fake answer."
 
     @staticmethod
     def vector(text: str) -> list[float]:
@@ -42,8 +46,13 @@ class FakeOllama:
         return [rng.uniform(-1, 1) for _ in range(settings.embedding_dimension)]
 
     def post(self, url, json, timeout):
-        self.requests.append(json)
-        body = {"model": json["model"], "embeddings": [self.vector(text) for text in json["input"]]}
+        if url.endswith("/api/chat"):
+            self.chats.append(json)
+            body = {"model": json["model"], "message": {"role": "assistant", "content": self.chat_reply},
+                    "done": True, "done_reason": "stop", "prompt_eval_count": 100, "eval_count": 10}
+        else:
+            self.requests.append(json)
+            body = {"model": json["model"], "embeddings": [self.vector(text) for text in json["input"]]}
         return httpx.Response(200, json=body, request=httpx.Request("POST", url))
 
 
