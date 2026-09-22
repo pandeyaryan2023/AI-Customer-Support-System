@@ -29,6 +29,7 @@ Authenticated endpoints need the header `Authorization: Bearer <token>`.
 | PATCH | `/tickets/{id}` | assigned agent, admin | Change status (e.g. RESOLVED), priority, category |
 | POST | `/tickets/{id}/assign` | agent (claim unassigned / hand over own), admin | Assign or reassign |
 | POST | `/tickets/{id}/escalate` | assigned agent, admin | Escalate with a reason |
+| POST | `/tickets/{id}/ai-analysis` | agent, admin who can view the ticket | AI suggestions (nothing is changed or sent) |
 
 ## Categories and admin
 
@@ -97,6 +98,28 @@ empty, never low-scoring chunks) or `NO_INDEXED_DOCUMENTS`; a `message`; the `to
 and `results`: `chunk_id`, `document_id`, `document_title`, `chunk_index`, `text`, `similarity`.
 No vectors, stored filenames or paths are returned. If Ollama or the database is unavailable the
 response is **503** with the reason, never an empty result.
+
+## AI ticket analysis
+
+`POST /tickets/{id}/ai-analysis` (no body) returns suggestions from the local `llama3.2:3b`:
+
+```json
+{"category": {"id": 3, "name": "Refunds"}, "priority": "HIGH", "sentiment": "negative",
+ "summary": "...", "suggested_reply": "...", "model": "llama3.2:3b", "ignored_instructions": false}
+```
+
+Customers get 403; an agent gets 404 for a ticket they may not view (the same rule as
+`GET /tickets/{id}`). The model reads the title, the description (up to 300 words), the last 8
+messages as "Customer" / "Support agent" (up to 120 words each, 1,000 in total) and the current
+category and priority: no names, emails or ids. Its answer is forced into a JSON schema and then
+checked again: `category` is only ever an **active existing** category (anything else, including an
+invented name, becomes null), `priority` one of LOW / MEDIUM / HIGH / URGENT, `sentiment` one of
+positive / neutral / negative; any field without a usable value is null. Sentences in the ticket
+addressed to the AI ("ignore your instructions...") are left out of what the model reads, and
+`ignored_instructions` tells the agent this happened. Nothing is stored and nothing is changed or
+sent: the agent applies a suggestion with the normal `PATCH /tickets/{id}` and sends a reply with
+the normal `POST /tickets/{id}/messages`. If the model is unavailable or returns nothing usable, the
+response is 503 with a generic message.
 
 ## AI assistant
 

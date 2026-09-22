@@ -22,6 +22,7 @@ const NAV_FOR_ROLE = { CUSTOMER: "tickets", AGENT: "mine", ADMIN: "tickets" };
 let ticket = null;
 let agents = [];
 let shell = null;
+let analysis = null; // the latest AI suggestions for this ticket, kept only in this page
 
 if (session) init();
 
@@ -97,9 +98,15 @@ function render() {
     actions: [backButton()],
   });
 
-  const main = h("div", { class: "stack" }, detailCard(), conversationCard());
+  // Re-rendering rebuilds the reply box; keep whatever the agent had typed (or a used draft).
+  const typed = document.querySelector(".composer textarea")?.value || "";
+
+  const main = h("div", { class: "stack" }, detailCard(), isStaff() ? aiCard() : null, conversationCard());
   shell.body.replaceChildren(
     isStaff() ? h("div", { class: "ticket-grid" }, main, managePanel()) : main);
+
+  const box = document.querySelector(".composer textarea");
+  if (box && typed) box.value = typed;
 
   const thread = document.getElementById("thread");
   if (thread) thread.scrollTop = thread.scrollHeight;
@@ -149,6 +156,106 @@ function handoffSection(handoff) {
 
 function fact(label, value) {
   return h("div", { class: "fact" }, h("dt", {}, label), h("dd", {}, value));
+}
+
+/* ---------------------------------------------------------- AI ticket analysis */
+
+/* Suggestions from the local model. Nothing is changed or sent here: category and priority
+   use the normal update (so the usual permission rules apply), and the draft only fills
+   the reply box. Sending is always the agent's own click. */
+function aiCard() {
+  const run = h("button", { class: "btn btn-secondary btn-sm", type: "button" },
+    analysis ? "Analyse again" : "Analyse ticket");
+  const body = h("div", { class: "ai-body" }, analysis ? aiResult() : h("p", { class: "meta" },
+    "Suggests a category, priority, customer sentiment, a short summary and a draft reply. "
+    + "Nothing changes on the ticket until you apply it."));
+  const card = h("section", { class: "card ai-card" },
+    h("div", { class: "card-head" },
+      h("h2", { class: "section-title" }, "AI ticket analysis"),
+      h("span", { class: "badge badge-plain ai-label" }, "Suggestions"),
+      run),
+    body);
+
+  run.addEventListener("click", async () => {
+    setLoading(run, true);
+    body.replaceChildren(h("div", { "aria-busy": "true" },
+      h("p", { class: "meta" }, "Reading the ticket… this can take up to a minute."),
+      h("div", { class: "ask-skeleton" },
+        h("span", { class: "skeleton sk-line", style: "width:70%" }),
+        h("span", { class: "skeleton sk-line", style: "width:90%" }),
+        h("span", { class: "skeleton sk-line", style: "width:50%" }))));
+    try {
+      analysis = await api(`/tickets/${ticket.id}/ai-analysis`, { method: "POST" });
+      card.replaceWith(aiCard());
+    } catch (error) {
+      body.replaceChildren(h("p", { class: "field-error" }, error.message));
+      setLoading(run, false);
+    }
+  });
+  return card;
+}
+
+function aiResult() {
+  const a = analysis;
+  const currentCategory = ticket.category ? ticket.category.id : null;
+  return h("div", {},
+    h("dl", { class: "ai-grid" },
+      aiRow("Category", a.category ? `AI suggests: ${a.category.name}` : "No suggestion",
+        a.category ? applyButton(a.category.id === currentCategory, { category_id: a.category.id },
+          "Category updated.") : null),
+      aiRow("Priority", a.priority ? `AI suggests: ${titleCase(a.priority)}` : "No suggestion",
+        a.priority ? applyButton(a.priority === ticket.priority, { priority: a.priority },
+          "Priority updated.") : null),
+      aiRow("Customer sentiment", a.sentiment
+        ? h("span", { class: `badge sentiment-${a.sentiment}` }, titleCase(a.sentiment))
+        : "Not clear", null)),
+    a.ignored_instructions ? h("p", { class: "ai-warning" }, icon("alert"),
+      "This ticket contains text addressed to the AI (such as \"ignore your instructions\"). "
+      + "It was left out of the analysis. Read the ticket yourself before acting.") : null,
+    h("div", { class: "ai-block" },
+      h("h3", { class: "label" }, "Summary"),
+      h("p", {}, a.summary || "No summary was produced.")),
+    a.suggested_reply ? draftBlock(a.suggested_reply) : null,
+    h("p", { class: "meta ai-foot" },
+      `Suggested by ${a.model} from this ticket's text. Suggestions can be wrong: check them before acting.`));
+}
+
+function aiRow(label, value, action) {
+  return h("div", { class: "ai-row" }, h("dt", {}, label), h("dd", {}, value), action);
+}
+
+/** Apply one suggestion through the normal ticket update. */
+function applyButton(isCurrent, change_, successText) {
+  if (isCurrent) return h("span", { class: "meta" }, "Already set");
+  if (isClosed()) return h("span", { class: "meta" }, "Ticket closed");
+  if (!canManage()) return h("span", { class: "meta" }, "Assign to yourself to apply");
+  const button = h("button", { class: "btn btn-secondary btn-sm", type: "button" }, "Apply");
+  button.addEventListener("click", () =>
+    change(button, () => api(`/tickets/${ticket.id}`, { method: "PATCH", json: change_ }), successText));
+  return button;
+}
+
+function draftBlock(text) {
+  const canReply = canManage() && !isClosed();
+  const use = h("button", { class: "btn btn-sm", type: "button" }, "Use draft");
+  use.addEventListener("click", () => {
+    const box = document.querySelector(".composer textarea");
+    if (!box) return;
+    if (box.value.trim() && box.value !== text
+        && !confirm("Replace what is in your reply box with the AI draft?")) return;
+    box.value = text;  // placed in the editor only: nothing is sent
+    box.focus();
+    box.scrollIntoView({ behavior: "smooth", block: "center" });
+    toast("Draft placed in your reply. Review and edit it before sending.", "info");
+  });
+  return h("div", { class: "ai-block" },
+    h("h3", { class: "label" }, "Suggested reply ", h("span", { class: "badge badge-plain ai-label" }, "AI draft")),
+    h("p", { class: "ai-draft" }, text),
+    h("div", { class: "ai-draft-actions" },
+      canReply ? use : null,
+      h("span", { class: "meta" }, canReply
+        ? "Review and edit it before sending. It is never sent automatically."
+        : "Assign this ticket to yourself to reply.")));
 }
 
 function conversationCard() {

@@ -23,8 +23,13 @@ class LLMReply:
     answer_tokens: int | None  # how much it wrote
 
 
-def chat(messages: list[dict]) -> LLMReply:
-    """Send a conversation (system + user messages) and return the model's reply."""
+def chat(messages: list[dict], *, json_schema: dict | None = None,
+         max_tokens: int | None = None) -> LLMReply:
+    """Send a conversation (system + user messages) and return the model's reply.
+
+    json_schema: make Ollama answer with JSON of exactly this shape (constrained decoding).
+    max_tokens: a different cap on the reply length than the default.
+    """
     url = f"{settings.ollama_url}/api/chat"
     payload = {
         "model": settings.llm_model,
@@ -33,9 +38,11 @@ def chat(messages: list[dict]) -> LLMReply:
         "options": {
             "temperature": settings.llm_temperature,
             "num_ctx": settings.llm_context_tokens,
-            "num_predict": settings.llm_max_answer_tokens,
+            "num_predict": max_tokens or settings.llm_max_answer_tokens,
         },
     }
+    if json_schema is not None:
+        payload["format"] = json_schema
     try:
         response = httpx.post(url, json=payload, timeout=settings.llm_timeout_seconds)
     except httpx.TimeoutException as error:

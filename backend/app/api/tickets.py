@@ -1,6 +1,7 @@
+import logging
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.api.deps import CurrentUser, DbSession, require_roles
 from app.models import Priority, Role, TicketStatus, User
@@ -14,7 +15,11 @@ from app.schemas.ticket import (
     TicketOut,
     TicketUpdate,
 )
-from app.services import ticket_service
+from app.schemas.ticket_ai import TicketAnalysisOut
+from app.services import ticket_ai_service, ticket_service
+from app.services.ticket_ai_service import AnalysisUnavailable
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/tickets", tags=["Tickets"])
 
@@ -68,3 +73,19 @@ def assign_ticket(ticket_id: int, data: AssignRequest, db: DbSession, user: Staf
 def escalate_ticket(ticket_id: int, data: EscalateRequest, db: DbSession, user: StaffUser):
     ticket = ticket_service.get_ticket_for_user(db, ticket_id, user)
     return ticket_service.escalate_ticket(db, user, ticket, data)
+
+
+@router.post("/{ticket_id}/ai-analysis", response_model=TicketAnalysisOut)
+def analyse_ticket(ticket_id: int, db: DbSession, user: StaffUser):
+    """AI suggestions for this ticket: category, priority, sentiment, summary and a draft reply.
+
+    Suggestions only: nothing is changed, saved or sent. The agent applies what they agree
+    with through the normal endpoints. Same access rule as viewing the ticket.
+    """
+    ticket = ticket_service.get_ticket_for_user(db, ticket_id, user)
+    try:
+        return ticket_ai_service.analyze_ticket(db, ticket)
+    except AnalysisUnavailable as error:
+        logger.error("AI ticket analysis failed for ticket %s: %s", ticket_id, error)  # details stay in the log
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE,
+                            "AI analysis is unavailable right now. Please try again.")
