@@ -9,9 +9,10 @@ import httpx
 
 from app.core.config import settings
 
-# nomic-embed-text was trained with task prefixes. Stored text is embedded as a
-# "search_document"; Phase 4 must embed questions as "search_query: ..." to match.
+# nomic-embed-text was trained with task prefixes: stored text is embedded as a
+# "search_document", and questions as a "search_query", so the two can be compared.
 DOCUMENT_PREFIX = "search_document: "
+QUERY_PREFIX = "search_query: "
 BATCH_SIZE = 16  # texts per request, so one request never grows too large
 
 
@@ -26,6 +27,12 @@ def embed_documents(texts: list[str]) -> list[list[float]]:
     for start in range(0, len(inputs), BATCH_SIZE):
         vectors.extend(_embed_batch(inputs[start:start + BATCH_SIZE]))
     return vectors
+
+
+def embed_query(question: str) -> list[float]:
+    """The vector for a search question, comparable with the stored document vectors."""
+    [vector] = _embed_batch([QUERY_PREFIX + question])
+    return vector
 
 
 def _embed_batch(inputs: list[str]) -> list[list[float]]:

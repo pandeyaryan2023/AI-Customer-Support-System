@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     embedding_dimension: int = 768  # how many numbers nomic-embed-text returns per text
     ollama_timeout_seconds: float = 120  # the first call also loads the model into memory
 
+    # Semantic search. How many chunks to return at most, and the lowest cosine similarity
+    # accepted as "relevant". INITIAL PROTOTYPE THRESHOLD, measured on 2026-09-22 with
+    # nomic-embed-text and the test knowledge base: answered questions scored 0.578-0.828,
+    # unrelated or unanswered ones 0.386-0.532. Re-measure when documents or model change.
+    search_top_k: int = 3
+    search_similarity_threshold: float = 0.55
+
     model_config = SettingsConfigDict(env_file=ENV_FILE, env_file_encoding="utf-8")
 
     @property

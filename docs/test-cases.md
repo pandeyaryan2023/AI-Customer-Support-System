@@ -1,7 +1,8 @@
 # Test cases
 
-Automated tests: `cd backend; pytest`. Last run: **139 passed** (2026-09-22), using in-memory SQLite
-and a fake Ollama (`tests/conftest.py`), so no test needs Ollama running.
+Automated tests: `cd backend; pytest`. Last run: **189 passed, 20 skipped** (2026-09-22), using
+in-memory SQLite and a fake Ollama (`tests/conftest.py`), so no test needs Ollama running.
+The 20 skipped are the opt-in real-model tests (`RUN_OLLAMA_TESTS=1`): **20 passed** when run.
 Not yet covered by pytest: PostgreSQL-specific behaviour, AI, AWS (none built yet).
 
 ## Browser walkthrough (scripted, Microsoft Edge)
@@ -179,6 +180,58 @@ vector identical to a fresh Ollama call; three re-runs left exactly 1 chunk row;
 words it gave 5 sequential chunks; an unreachable Ollama gave `FAILED` with no chunks and
 **Retry indexing** in the browser fixed it. 12/12 API/database checks and 9/9 browser checks
 passed, 0 console errors, no overflow at 390 px.
+
+## Vector maths (`tests/test_vector_math.py`, 18 tests)
+
+| Case | Expected |
+|---|---|
+| Known angle, identical, scaled, orthogonal, opposite vectors | 0.7071, 1, 1, 0, -1 |
+| Matrix version vs the formula row by row (768 dimensions) | Equal |
+| Mismatched dimensions; zero question or zero stored vector | ValueError |
+| Ranking; threshold (inclusive); top_k; nothing above threshold; no scores; ties | Highest first; filtered; cut; empty; empty; original order |
+| Stored vectors that are missing, text, a dict, too short, non-numeric, NaN, all zero | Left out of the matrix |
+
+## Search service and API (`tests/test_search.py`, 32 tests)
+
+Chunks are seeded with vectors along known axes, so the right scores are known exactly.
+
+| Case | Expected |
+|---|---|
+| Mostly-refund question | Only the refund chunk (0.909 >= 0.55); exact fields; no vectors or file names |
+| threshold 0 | All chunks, highest first, scores 0.909 / 0.404 / 0.101 |
+| Question sent to Ollama | Trimmed, with `search_query: ` prefix |
+| Two documents | Both can appear, ranked together |
+| threshold 0.95 / 0.55 / 0.3 / 0; top_k 2 / 1; settings changed | 0 / 1 / 2 / 3 results; 2 / 1; defaults follow settings |
+| top_k 0 or 21, threshold -0.1 or 1.5, top_k "many" | 422 |
+| Unrelated question | `NO_MATCH`, no results, best_similarity 0 |
+| Empty knowledge base; only FAILED documents | `NO_INDEXED_DOCUMENTS`, Ollama not called |
+| FAILED, NOT_INDEXED, extraction-failed and other-model chunks that match perfectly | Never returned |
+| Query empty, blank, 1 character, 501 characters, missing | 422 |
+| Extra field (`business_id`, `document_ids`, `scope`) | 422 |
+| Ollama down; question vector wrong size, empty or all zeros | 503 with the reason |
+| Damaged stored vectors; all stored vectors damaged | Skipped and counted; 503 "Re-index" |
+| Database fails while loading chunks | 503 "The knowledge base could not be read" |
+| Customer or agent; no token | 403; 401 |
+
+## Retrieval quality with the real model (`tests/test_retrieval_quality.py`, 20 tests, opt-in)
+
+The test PDF's text is indexed for real, at the default size (1 chunk) and at one chunk per section.
+Six answerable questions must find their section (ranked first when sections are separate chunks);
+three unrelated questions must return `NO_MATCH`; threshold 0.9 must reject a real match.
+
+Manual check (2026-09-22, scratch PostgreSQL, real `nomic-embed-text`, the test PDF, default settings):
+
+| Question | Top result | Similarity | Threshold | Result |
+|---|---|---:|---:|---|
+| Can I get my money back after 20 days? | chunk 0 (whole document) | 0.656 | 0.55 | FOUND |
+| What is the company's refund time limit? | chunk 0 (whole document) | 0.789 | 0.55 | FOUND |
+| How long does delivery take? | chunk 0 (whole document) | 0.667 | 0.55 | FOUND |
+| When is customer support available? | chunk 0 (whole document) | 0.729 | 0.55 | FOUND |
+| What is the capital of France? | (chunk 0 scored 0.387) | 0.387 | 0.55 | NO_MATCH |
+
+With one chunk per section the top chunk was the right section every time (0.664, 0.784, 0.781,
+0.828; France 0.425). A FAILED document was not searched, an unreachable Ollama gave
+SearchUnavailable, and each search took about 0.4–0.5 s. 9/9 checks passed.
 
 ## Manual tests still to do
 

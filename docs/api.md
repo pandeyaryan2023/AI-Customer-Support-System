@@ -75,6 +75,29 @@ not running, model not installed, invalid reply). A document has chunks only whe
 `INDEXED`; re-indexing replaces its chunks in one transaction, so they are never duplicated.
 A failed indexing never fails the upload, and never touches the file or the extracted text.
 
+## Semantic search
+
+| Method | Path | Who | Purpose |
+|---|---|---|---|
+| POST | `/admin/documents/search` | admin | Find the chunks closest in meaning to a question (retrieval only, no answer) |
+
+Body: `{"query": "Can I get my money back after 20 days?", "top_k": 3, "threshold": 0.55}`.
+`query` is 2–500 characters; `top_k` (1–20) and `threshold` (0–1) are optional and default to
+`search_top_k` = 3 and `search_similarity_threshold` = 0.55 (an *initial prototype threshold*,
+measured on the test knowledge base). Any other field is rejected (422), so a request cannot
+choose which knowledge base it searches.
+
+The question is embedded with the `search_query: ` prefix (documents use `search_document: `),
+compared by cosine similarity with every chunk of an `INDEXED` document made by the same model,
+ranked highest first, filtered by the threshold and cut to `top_k`.
+
+The response has `outcome`: `FOUND`, `NO_MATCH` (nothing reached the threshold; `results` is
+empty, never low-scoring chunks) or `NO_INDEXED_DOCUMENTS`; a `message`; the `top_k` and
+`threshold` used; `chunks_searched`, `chunks_skipped` (damaged vectors left out), `best_similarity`;
+and `results`: `chunk_id`, `document_id`, `document_title`, `chunk_index`, `text`, `similarity`.
+No vectors, stored filenames or paths are returned. If Ollama or the database is unavailable the
+response is **503** with the reason, never an empty result.
+
 ## Status change rules
 
 ```
