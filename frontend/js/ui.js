@@ -45,6 +45,7 @@ const ICON_PATHS = {
   file: "M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6",
   upload: "M12 15V3M7 8l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4",
   shield: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z",
+  send: "M22 2 11 13M22 2l-7 20-4-9-9-4z",
 };
 
 function icon(name, extraClass) {
@@ -201,7 +202,6 @@ const NAV = {
   CUSTOMER: [
     { id: "dashboard", label: "Dashboard", icon: "dashboard" },
     { id: "tickets", label: "My complaints", icon: "ticket" },
-    { id: "ask", label: "Ask support", icon: "message" },
   ],
   AGENT: [
     { id: "dashboard", label: "Dashboard", icon: "dashboard" },
