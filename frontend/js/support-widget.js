@@ -1,19 +1,27 @@
 "use strict";
 
 /* Customer support widget: a floating button (bottom-right) that opens a small chat panel.
-   It uses the same POST /ai/ask as before. The reply now says which kind of message it was
+   It uses the same POST /ai/ask as before. The reply says which kind of message it was
    (`intent`), and each kind looks different: a company answer carries the help articles it came
-   from, a general answer says plainly that it is not company information, and a complaint or a
-   request for a person offers the support team instead (the existing handoff + complaint form).
+   from, a general answer says plainly that it is not company information, a complaint or a
+   request for a person offers the support team instead (the existing handoff + complaint form),
+   and hello, thanks, goodbye and small talk are plain chat, with nothing attached.
    Only customers get it; agents and admins keep their own interface. */
 
 const supportWidget = createSupportWidget();
+
+/* Replies that are simply conversation: no badge, no sources, no next step. */
+const CHAT_INTENTS = ["GREETING", "THANKS", "FAREWELL", "ACKNOWLEDGEMENT", "CASUAL_CONVERSATION"];
 
 function createSupportWidget() {
   const session = getSession();
   if (!session || session.role !== "CUSTOMER") return null;
 
   const title = `${session.business || "Customer"} Support`;
+  // The signed-in customer's own first name, as the server sent it at login.
+  const firstName = /^[\p{L}][\p{L}'\-.]{0,19}$/u.test((session.name || "").trim().split(" ")[0] || "")
+    ? session.name.trim().split(" ")[0]
+    : null;
   let busy = false;
 
   const launcher = h("button", {
@@ -22,14 +30,15 @@ function createSupportWidget() {
   }, icon("message"));
 
   const log = h("div", { class: "sw-log", role: "log", "aria-live": "polite", "aria-label": "Conversation" },
-    botMessage(h("p", {}, "Hi! Ask about our policies, orders or products and I'll answer from our "
-      + "help articles. If something has gone wrong, our support team can take it on.")));
+    botMessage(h("p", {}, `${firstName ? `Hi ${firstName}!` : "Hi there!"} 👋 Ask me about our policies, `
+      + "orders or products and I'll answer from our help articles. If something has gone wrong, "
+      + "our support team can take it on.")));
 
   const input = h("textarea", {
     id: "sw-question", class: "sw-input", rows: "1", maxlength: "500",
-    placeholder: "Ask a question…", "aria-label": "Your question",
+    placeholder: "Type a message…", "aria-label": "Your message",
   });
-  const send = h("button", { class: "btn sw-send", type: "submit" }, icon("send"), "Ask");
+  const send = h("button", { class: "btn sw-send", type: "submit" }, icon("send"), "Send");
   const form = h("form", { class: "sw-form" }, input, send);
 
   const panel = h("section", {
@@ -117,6 +126,7 @@ function createSupportWidget() {
   /* One message per kind of reply. An intent we don't know is shown as a company answer, which is
      the careful one: it only repeats our own articles, and says so. */
   function replyMessage(reply, question) {
+    if (CHAT_INTENTS.includes(reply.intent) && reply.status === "ANSWERED") return chatMessage(reply);
     if (reply.intent === "GENERAL" && reply.status === "ANSWERED") return generalMessage(reply);
     if (reply.intent === "COMPLAINT") {
       return requestMessage(reply, question, "ticket", "Support request", "Raise a Complaint");
@@ -141,6 +151,11 @@ function createSupportWidget() {
             `Relevance ${source.similarity.toFixed(2)}`)))),
       h("p", { class: "meta" },
         "This answer was written by AI from the sources above. If something looks wrong, contact our support team."));
+  }
+
+  /* Hello, thanks, goodbye and small talk: just what was said, like a person would reply. */
+  function chatMessage(reply) {
+    return botMessage(h("p", { class: "sw-answer" }, reply.answer));
   }
 
   /* A general answer, with no company article behind it. It must not look like one: no sources,

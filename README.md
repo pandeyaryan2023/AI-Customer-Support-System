@@ -10,7 +10,7 @@ BCA-507 Minor Project. Customers raise complaints, support agents resolve them, 
 | Backend: FastAPI + PostgreSQL + SQLAlchemy + Alembic | Done |
 | Authentication (bcrypt + JWT) and role-based access | Done |
 | Core ticket management (customer / agent / admin APIs) | Done |
-| Automated tests (pytest) | 399 passing, plus 20 opt-in tests against the real model (see [docs/test-cases.md](docs/test-cases.md)) |
+| Automated tests (pytest) | 460 passing, plus 20 opt-in tests against the real model (see [docs/test-cases.md](docs/test-cases.md)) |
 | Knowledge base: document upload, storage, list, delete | Done (Phase 1) — no AI yet |
 | Knowledge base: text extraction from PDF (pypdf) and UTF-8 text | Done (Phase 2) |
 | Knowledge base: text cleaning, chunking, local embeddings (Ollama `nomic-embed-text`) | Done (Phase 3) |
@@ -20,6 +20,7 @@ BCA-507 Minor Project. Customers raise complaints, support agents resolve them, 
 | AI ticket analysis for agents: suggested category, priority, sentiment, summary and draft reply | Done (Phase 7) — suggestions only |
 | Multi-tenancy: several businesses on one installation, each with its own users, tickets, categories and knowledge | Done (Phase 8) |
 | Intent routing: a company question, a general question, a complaint or a request for a person, each answered differently | Done (Phase A) |
+| Conversational assistant: hello, thanks, goodbye and small talk, answered by name from the customer's own account | Done (Phase 9A) |
 | Frontend (HTML / CSS / JavaScript) | Done — customer, agent and admin interfaces, with a token-based design system ([docs/design-system.md](docs/design-system.md)) |
 | AWS and Amazon Connect | Not started |
 

@@ -159,14 +159,24 @@ rejected with 422, so a client cannot pass rules, context, a model — or an int
 | `GENERAL` | Nothing to do with this business: the model answers from general knowledge and is told to say nothing about the shop. The knowledge base is never searched | General | Always empty |
 | `COMPLAINT` | Something has gone wrong: a fixed acknowledgement. **No ticket is created** | Fixed text, `model` null | Empty |
 | `HUMAN_HANDOFF` | The customer asked for a person: a fixed reply pointing at the complaint form | Fixed text, `model` null | Empty |
+| `GREETING` `THANKS` `FAREWELL` `ACKNOWLEDGEMENT` | A short friendly line the server wrote itself. No model call, no search | Fixed text, `model` null | Empty |
+| `CASUAL_CONVERSATION` | Small talk, or a question about the assistant. The model may describe what it does, and nothing about the shop | General, `model` set | Empty |
 
 The decision is a separate `llama3.2:3b` call constrained to a JSON schema
 (`intent`, `confidence`, `reason`), not a similarity score, so "Do you sell gift cards?" is a
 company question even when no article mentions gift cards. The message is passed as data inside a
-`<message>` block. Anything unusable — not JSON, an intent outside the four, or Ollama being
-down — falls back to `COMPANY_KNOWLEDGE`, the careful path, which only repeats stored company
-text and refuses when it cannot. The model's `confidence` and `reason` stay on the server (log
-only) and are never part of the response.
+`<message>` block. A message that is only an everyday phrase ("hi", "thanks a lot", "ok", "bye")
+is matched against a fixed list first and skips the model entirely; anything longer, including
+"hi, where is my order?", is classified normally. Anything unusable — not JSON, an intent outside
+the nine, or Ollama being down — falls back to `COMPANY_KNOWLEDGE`, the careful path, which only
+repeats stored company text and refuses when it cannot. The model's `confidence` and `reason` stay
+on the server (log only) and are never part of the response.
+
+The four conversational replies use the caller's **first name** ("Hi Rahul! How can I help you
+today?"), taken from their own authenticated account — never from the request, which still
+rejects any field other than `question` with 422. Answers to real questions are not personalised,
+and a stored name that is not a plain name (markup, digits, over 20 characters) is simply not
+used: the reply falls back to "Hi there!".
 
 `status` is `ANSWERED` or `NOT_ENOUGH_INFORMATION` (a fixed reply, no sources). The second happens
 when search finds nothing relevant (the model is **not** called; `model` is null), when the

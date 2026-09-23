@@ -25,7 +25,12 @@ def ask(body: AskRequest, db: DbSession, user: Asker):
     The message is first sorted into an `intent`: COMPANY_KNOWLEDGE is answered from the
     knowledge base as before (grounded, with its sources), GENERAL gets a general answer with
     no company facts and no sources, COMPLAINT gets an acknowledgement, and HUMAN_HANDOFF a
-    pointer to a person. No ticket is ever created here.
+    pointer to a person. GREETING, THANKS, FAREWELL, ACKNOWLEDGEMENT and CASUAL_CONVERSATION
+    are answered conversationally, without touching the knowledge base. No ticket is ever
+    created here.
+
+    The greeting uses the caller's own first name, taken from their authenticated account.
+    The request cannot pass a name, an id or an intent.
 
     `status` is ANSWERED (with the sources the answer is based on) or
     NOT_ENOUGH_INFORMATION (the assistant is not answering). The second comes with a
@@ -34,7 +39,7 @@ def ask(body: AskRequest, db: DbSession, user: Asker):
     """
     scope = search_service.scope_for(user)  # decided by the server, not by the request
     try:
-        answer = assistant_service.answer(db, body.question, scope)
+        answer = assistant_service.answer(db, body.question, scope, user)
     except AssistantUnavailable as error:
         logger.error("AI assistant unavailable: %s", error)  # the real reason stays in the log
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE,

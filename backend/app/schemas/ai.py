@@ -26,8 +26,9 @@ class SourceOut(BaseModel):
 class AskOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    # What the message was: a question about the company, a general question, a complaint,
-    # or a request for a person. It decides how the answer should be presented.
+    # What the message was: a question about the company, a general question, a complaint, a
+    # request for a person, or conversation (hello, thanks, goodbye, an acknowledgement, small
+    # talk). It decides how the answer should be presented.
     intent: Intent
     status: AnswerStatus  # ANSWERED or NOT_ENOUGH_INFORMATION
     answer: str

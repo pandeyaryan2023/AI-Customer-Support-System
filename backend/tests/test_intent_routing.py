@@ -63,7 +63,8 @@ def test_what_the_classifier_is_asked(fake_ollama):
     assert request["messages"][0] == {"role": "system", "content": intent_router.SYSTEM_PROMPT}
     assert request["messages"][1]["content"] == "<message>\nDo you sell gift cards?\n</message>"
     assert request["format"]["properties"]["intent"]["enum"] == \
-        ["COMPANY_KNOWLEDGE", "GENERAL", "COMPLAINT", "HUMAN_HANDOFF"]
+        ["COMPANY_KNOWLEDGE", "GENERAL", "COMPLAINT", "HUMAN_HANDOFF", "GREETING", "THANKS",
+         "FAREWELL", "ACKNOWLEDGEMENT", "CASUAL_CONVERSATION"]
     assert request["options"]["num_predict"] == 120
 
 

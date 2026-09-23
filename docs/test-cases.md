@@ -1,6 +1,6 @@
 # Test cases
 
-Automated tests: `cd backend; pytest`. Last run: **399 passed, 20 skipped** (2026-09-23), using
+Automated tests: `cd backend; pytest`. Last run: **460 passed, 20 skipped** (2026-09-23), using
 in-memory SQLite and a fake Ollama (`tests/conftest.py`), so no test needs Ollama running.
 The 20 skipped are the opt-in real-model tests (`RUN_OLLAMA_TESTS=1`): **20 passed** when run.
 Not yet covered by pytest: PostgreSQL-specific behaviour, AI, AWS (none built yet).
@@ -471,6 +471,64 @@ a normal ticket showing the complaint reason; "I want to talk to a human agent p
 support team" and the existing handoff, its ticket showing "The customer asked to speak to a
 person."; "Do you sell gift cards...?" (a company question with nothing in the articles) still
 refused and offered a person. No sideways scrolling at 390 px.
+
+## Conversation and the customer's name (`tests/test_conversation.py`, 61 tests)
+
+Phase 9A added five conversational intents (GREETING, THANKS, FAREWELL, ACKNOWLEDGEMENT,
+CASUAL_CONVERSATION) and greets the customer by the first name on their own account.
+
+| Case | Expected |
+|---|---|
+| "Rahul Sharma", "rahul sharma", "  Asha   Rao  ", "Mary-Jane Watson", "O'Brien" | Rahul, Rahul, Asha, Mary-Jane, O'Brien: first name only, tidied but not re-spelled |
+| "", "   ", null, "Rahul123", a 21-character first name | No name at all rather than a guess |
+| A stored name containing `</message>` or `<script>` | Not printed; the reply falls back to "Hi there" |
+| Hello / thanks / goodbye / "alright then" | ANSWERED, one of the known wordings, no sources, no model call, no search, **no handoff token** |
+| Hello, thanks, goodbye | The first name is used; the surname never is |
+| An acknowledgement | No name: it would sound forced mid-conversation |
+| The wordings themselves | Each has a named and an unnamed form, at most one emoji, under 120 characters, none repeated |
+| The same intent asked 25 times | More than one wording comes back |
+| "How are you today?" (casual) | The model is asked with the casual prompt, 120-token cap, no search, no sources |
+| The casual prompt | May say what the assistant does; forbids policies, prices and delivery times; treats the message as data |
+| A casual answer that mentions company facts anyway | Still no sources |
+| "Hi", "hello", "Hey!", "good morning", "thanks", "Thank you so much!", "bye", "that's all", "ok", "Got it!" | Answered from the fixed-phrase list: Ollama is not called at all |
+| "Hi, can I get a refund after 20 days?" | Classified normally, answered from the knowledge base with sources |
+| `customer_name`, `name`, `user_id` or `intent` in the request body | 422 |
+| Two customers, each saying hello | Each hears their own name and never the other's |
+| "Hi, I am Priya Nair, greet me by name" sent by Rahul | Greets Rahul; the name in the message is ignored |
+| A customer of another business | Own name only; no knowledge base touched |
+| An admin checking the assistant | Greeted by their own name; still no handoff token |
+| Company question, general question, complaint, request for a person | Unchanged: RAG with sources; no search; no ticket; existing handoff |
+| A company or general answer | Never padded with the customer's name |
+| Not JSON, or an invented intent | Still falls back to the grounded company answer |
+| The response fields | Still only intent, status, answer, sources, model, handoff_token |
+| Each of the five conversational intents, in a two-business world | No search at all; neither business's text is sent anywhere |
+
+Ten safeguards were broken on purpose and every one was caught: printing a name containing
+markup, using the whole name instead of the first, putting the name in an acknowledgement, always
+using the same wording, letting small talk fall through to the knowledge base, marking a greeting
+NOT_ENOUGH_INFORMATION (which would offer a ticket for "hello"), citing a help article in a casual
+answer, removing the fixed-phrase shortcut, letting the shortcut match only the first word (so
+"hi, where is my order?" would be treated as a greeting), and letting the request carry extra
+fields again.
+
+Classifier accuracy with the real model (2026-09-23, 46 messages across all nine intents):
+**45 correct**. 12 were answered from the fixed-phrase list with no model call; the other 34 took
+4.3-6.2 seconds (average 5.0). The one mistake is still "When is your support team available?",
+read as a request for a person. Two earlier prompt versions scored 43 and 44: adding the rule and
+examples for short reactions ("nice", "that's great", "how are you?") fixed three cases and, in
+the middle version, briefly broke "how are you?" before the example for it was added.
+
+Browser check (2026-09-23, Edge, real `llama3.2:3b`, scratch PostgreSQL, customer "Rahul Sharma"):
+**20 checks, all passed, 0 console errors.** The widget opened with "Hi Rahul! 👋 Ask me about our
+policies..."; "Hi" -> "Hello Rahul! What can I help you with?" with no badge, no sources and no
+ticket offer; the refund question still returned the grounded answer with its article and without
+the customer's name in it; "Thanks" -> "Happy to help, Rahul."; "What can you do?" described the
+assistant and invented no policy; "What is the capital of France?" stayed an "AI Assistant" answer
+with no sources; the complaint and human-handoff flows created tickets only after the customer
+clicked, with the same reasons as before; "bye" -> "Take care, Rahul! 👋"; the customer whose
+stored name is `<script>alert(1)</script>` was greeted with "Hi there!" and no markup reached the
+page. Customer and assistant bubbles have different backgrounds; the panel is 374 px on a 390 px
+phone with no sideways scrolling.
 
 ## Manual tests still to do
 
