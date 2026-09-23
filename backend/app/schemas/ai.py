@@ -2,6 +2,7 @@ from typing import Annotated, Optional
 
 from pydantic import BaseModel, ConfigDict, StringConstraints
 
+from app.services.intent_router import Intent
 from app.services.rag_service import AnswerStatus
 
 
@@ -25,9 +26,12 @@ class SourceOut(BaseModel):
 class AskOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    # What the message was: a question about the company, a general question, a complaint,
+    # or a request for a person. It decides how the answer should be presented.
+    intent: Intent
     status: AnswerStatus  # ANSWERED or NOT_ENOUGH_INFORMATION
     answer: str
-    sources: list[SourceOut]  # empty unless ANSWERED
+    sources: list[SourceOut]  # company sources; empty unless the answer came from the knowledge base
     model: Optional[str]      # the model that wrote the answer; null if none was asked
     # Only when NOT_ENOUGH_INFORMATION: send it with a new ticket (POST /tickets) to hand
     # the question to a human. Signed by the server, tied to this customer, short-lived.

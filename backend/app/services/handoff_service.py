@@ -30,6 +30,8 @@ REASONS = {
     "NO_USABLE_CONTEXT": "The matching articles contained no usable text.",
     "MODEL_DECLINED": "Related articles were found, but they do not answer the question.",
     "UNSUPPORTED_NUMBERS": "The AI's draft answer could not be checked against the articles, so it was not shown.",
+    "COMPLAINT": "The customer reported a problem rather than asking a question.",
+    "HUMAN_REQUESTED": "The customer asked to speak to a person.",
 }
 
 

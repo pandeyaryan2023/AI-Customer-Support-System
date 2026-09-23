@@ -71,6 +71,7 @@ def ollama(monkeypatch, fake_ollama):
 
     def post(url, json, timeout):
         if url.endswith("/api/embed"):
+            fake_ollama.requests.append(json)  # so a test can see whether the knowledge base was searched
             return httpx.Response(200, json={"embeddings": [state["question_vector"]]},
                                   request=httpx.Request("POST", url))
         return fake_ollama.post(url, json, timeout)  # chat: recorded, answered with chat_reply
@@ -102,6 +103,7 @@ def test_answerable_question(client, customer, knowledge_base, ollama):
     assert response.status_code == 200
     body = response.json()
     assert body == {
+        "intent": "COMPANY_KNOWLEDGE",  # a question about the company: the RAG path
         "status": "ANSWERED",
         "answer": "Yes. You can request a refund within 30 days of purchase, and 20 days is within that.",
         "sources": [{"document_title": "Support policy", "chunk_index": 0, "similarity": 0.9091}],
@@ -118,9 +120,9 @@ def test_no_match_gives_not_enough_information(client, customer, knowledge_base,
     fake = ollama(question_vector=vector(other=1))  # unrelated to every chunk
     body = ask(client, customer, "What is the capital of France?").json()
     assert body.pop("handoff_token")  # Phase 6: the customer may hand this to a human
-    assert body == {"status": "NOT_ENOUGH_INFORMATION", "answer": NOT_ENOUGH_INFORMATION_REPLY,
-                    "sources": [], "model": None}
-    assert fake.chats == []  # the model was never called
+    assert body == {"intent": "COMPANY_KNOWLEDGE", "status": "NOT_ENOUGH_INFORMATION",
+                    "answer": NOT_ENOUGH_INFORMATION_REPLY, "sources": [], "model": None}
+    assert fake.chats == []  # the model was never asked to answer
 
 
 def test_empty_knowledge_base_does_not_call_the_model(client, customer, ollama):
@@ -234,8 +236,8 @@ def test_answer_with_invented_numbers_is_not_trusted(client, customer, knowledge
     ollama(reply="Good news: refunds are unlimited, you can get one up to 365 days after purchase.")
     body = ask(client, customer).json()
     assert body.pop("handoff_token")
-    assert body == {"status": "NOT_ENOUGH_INFORMATION", "answer": NOT_ENOUGH_INFORMATION_REPLY,
-                    "sources": [], "model": "llama3.2:3b"}
+    assert body == {"intent": "COMPANY_KNOWLEDGE", "status": "NOT_ENOUGH_INFORMATION",
+                    "answer": NOT_ENOUGH_INFORMATION_REPLY, "sources": [], "model": "llama3.2:3b"}
 
 
 def test_customer_cannot_override_the_instructions(client, customer, knowledge_base, ollama):
@@ -292,8 +294,8 @@ def test_model_declining_gives_not_enough_information(client, customer, knowledg
     ollama(reply="I don't have enough information to answer that.")
     body = ask(client, customer).json()
     assert body.pop("handoff_token")
-    assert body == {"status": "NOT_ENOUGH_INFORMATION", "answer": NOT_ENOUGH_INFORMATION_REPLY,
-                    "sources": [], "model": "llama3.2:3b"}
+    assert body == {"intent": "COMPANY_KNOWLEDGE", "status": "NOT_ENOUGH_INFORMATION",
+                    "answer": NOT_ENOUGH_INFORMATION_REPLY, "sources": [], "model": "llama3.2:3b"}
 
 
 def test_chunk_made_only_of_instructions_is_not_sent(client, customer, add_document, ollama):

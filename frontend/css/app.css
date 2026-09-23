@@ -1233,8 +1233,17 @@ tbody tr:hover .row-action,
 .sw-msg .source-item { padding: var(--s1) var(--s2); }
 /* Narrow panel: icon and title share the first line; part and relevance wrap below. */
 .sw-msg .source-item .strong { flex: 1 1 calc(100% - 32px); min-width: 0; }
-.sw-notfound-title { display: flex; align-items: center; gap: var(--s2); font-weight: var(--fw-semibold); }
-.sw-notfound-title svg { width: 16px; height: 16px; color: var(--text-muted); flex: none; }
+.sw-msg-title { display: flex; align-items: center; gap: var(--s2); font-weight: var(--fw-semibold); }
+.sw-msg-title svg { width: 16px; height: 16px; color: var(--text-muted); flex: none; }
+/* A general answer is deliberately quieter than a grounded one: no accent, no sources. */
+.sw-general-label {
+  background: var(--canvas);
+  color: var(--text-muted);
+  box-shadow: inset 0 0 0 1px var(--line);
+  white-space: normal;
+  max-width: 100%;
+}
+.sw-general-label svg { width: 14px; height: 14px; }
 .sw-error { display: flex; align-items: flex-start; gap: var(--s2); color: var(--red-fg); }
 .sw-error svg { width: 16px; height: 16px; flex: none; margin-top: 3px; }
 .sw-typing { display: flex; align-items: center; gap: var(--s2); color: var(--text-muted); font-size: var(--fs-label); }

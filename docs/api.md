@@ -138,17 +138,35 @@ response is 503 with a generic message.
 
 | Method | Path | Who | Purpose |
 |---|---|---|---|
-| POST | `/ai/ask` | customer, admin | Answer a question from the knowledge base only |
+| POST | `/ai/ask` | customer, admin | Answer a customer's message, from the knowledge base or as a general question |
 
 Body: `{"question": "Can I get a refund after 20 days?"}` (2–500 characters; any other field is
-rejected with 422, so a client cannot pass rules, context or a model). Response:
+rejected with 422, so a client cannot pass rules, context, a model — or an intent). Response:
 
 ```json
-{"status": "ANSWERED",
+{"intent": "COMPANY_KNOWLEDGE",
+ "status": "ANSWERED",
  "answer": "You can request a refund within 30 days of purchase...",
  "sources": [{"document_title": "Customer support knowledge base", "chunk_index": 0, "similarity": 0.656}],
  "model": "llama3.2:3b"}
 ```
+
+`intent` is what the message was, decided by the server before anything else runs:
+
+| Intent | What happens | Answer | Sources |
+|---|---|---|---|
+| `COMPANY_KNOWLEDGE` | The knowledge base is searched and the answer is grounded in it, exactly as before | From the articles | The articles used |
+| `GENERAL` | Nothing to do with this business: the model answers from general knowledge and is told to say nothing about the shop. The knowledge base is never searched | General | Always empty |
+| `COMPLAINT` | Something has gone wrong: a fixed acknowledgement. **No ticket is created** | Fixed text, `model` null | Empty |
+| `HUMAN_HANDOFF` | The customer asked for a person: a fixed reply pointing at the complaint form | Fixed text, `model` null | Empty |
+
+The decision is a separate `llama3.2:3b` call constrained to a JSON schema
+(`intent`, `confidence`, `reason`), not a similarity score, so "Do you sell gift cards?" is a
+company question even when no article mentions gift cards. The message is passed as data inside a
+`<message>` block. Anything unusable — not JSON, an intent outside the four, or Ollama being
+down — falls back to `COMPANY_KNOWLEDGE`, the careful path, which only repeats stored company
+text and refuses when it cannot. The model's `confidence` and `reason` stay on the server (log
+only) and are never part of the response.
 
 `status` is `ANSWERED` or `NOT_ENOUGH_INFORMATION` (a fixed reply, no sources). The second happens
 when search finds nothing relevant (the model is **not** called; `model` is null), when the
@@ -158,7 +176,8 @@ the AI ("ignore previous instructions", "note for the assistant", "SYSTEM:"...) 
 before the model sees it. If search or the model is unavailable the response is **503** with a
 generic message; the real reason is only written to the server log.
 
-A `NOT_ENOUGH_INFORMATION` reply to a customer also carries a `handoff_token`. Nothing is
+A `NOT_ENOUGH_INFORMATION` reply to a customer also carries a `handoff_token` — including the
+complaint and "I want a person" replies, which use the same route. Nothing is
 stored and no ticket is created unless the customer chooses "Talk to Human Support", which
 sends the normal `POST /tickets` body plus `"handoff_token": "..."`. The token is signed by the
 server (audience `ai-handoff`, so it can never be used to log in), tied to the customer who

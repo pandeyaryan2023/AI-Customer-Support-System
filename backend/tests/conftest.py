@@ -1,3 +1,4 @@
+import json as jsonlib
 import os
 import random
 from types import SimpleNamespace
@@ -33,22 +34,35 @@ class FakeOllama:
     same vector, and different texts get different vectors.
 
     Answers POST /api/chat with `chat_reply`, and records each conversation it was sent.
+
+    An intent-classification request (the one carrying the intent router's JSON schema) is
+    answered with `intent_reply` and recorded in `intents` instead, so tests of the answering
+    paths see only the conversations meant for them.
     """
 
     def __init__(self):
         self.requests = []  # every embedding request "sent to Ollama", for tests to inspect
-        self.chats = []     # every chat request
+        self.chats = []     # every chat request, except classification
+        self.intents = []   # every intent-classification request
         self.chat_reply = "This is a fake answer."
+        self.intent_reply = jsonlib.dumps(
+            {"intent": "COMPANY_KNOWLEDGE", "confidence": 0.9, "reason": "asks about the shop"})
 
     @staticmethod
     def vector(text: str) -> list[float]:
         rng = random.Random(text)
         return [rng.uniform(-1, 1) for _ in range(settings.embedding_dimension)]
 
+    @staticmethod
+    def is_classification(payload):
+        return "intent" in payload.get("format", {}).get("properties", {})
+
     def post(self, url, json, timeout):
         if url.endswith("/api/chat"):
-            self.chats.append(json)
-            body = {"model": json["model"], "message": {"role": "assistant", "content": self.chat_reply},
+            classifying = self.is_classification(json)
+            (self.intents if classifying else self.chats).append(json)
+            content = self.intent_reply if classifying else self.chat_reply
+            body = {"model": json["model"], "message": {"role": "assistant", "content": content},
                     "done": True, "done_reason": "stop", "prompt_eval_count": 100, "eval_count": 10}
         else:
             self.requests.append(json)

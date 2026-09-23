@@ -1,8 +1,10 @@
 "use strict";
 
 /* Customer support widget: a floating button (bottom-right) that opens a small chat panel.
-   It uses the same POST /ai/ask as before: a grounded answer with its sources, or
-   "not enough information" with the existing human handoff (the shared complaint form).
+   It uses the same POST /ai/ask as before. The reply now says which kind of message it was
+   (`intent`), and each kind looks different: a company answer carries the help articles it came
+   from, a general answer says plainly that it is not company information, and a complaint or a
+   request for a person offers the support team instead (the existing handoff + complaint form).
    Only customers get it; agents and admins keep their own interface. */
 
 const supportWidget = createSupportWidget();
@@ -20,8 +22,8 @@ function createSupportWidget() {
   }, icon("message"));
 
   const log = h("div", { class: "sw-log", role: "log", "aria-live": "polite", "aria-label": "Conversation" },
-    botMessage(h("p", {}, "Hi! Ask a question and I'll answer from our help articles. "
-      + "If they don't cover it, you can reach our support team.")));
+    botMessage(h("p", {}, "Hi! Ask about our policies, orders or products and I'll answer from our "
+      + "help articles. If something has gone wrong, our support team can take it on.")));
 
   const input = h("textarea", {
     id: "sw-question", class: "sw-input", rows: "1", maxlength: "500",
@@ -37,12 +39,13 @@ function createSupportWidget() {
       h("span", { class: "sw-avatar", "aria-hidden": "true" }, icon("headset")),
       h("div", { class: "sw-head-text" },
         h("h2", { id: "sw-title", class: "sw-title" }, title),
-        h("p", { class: "sw-sub" }, "AI answers from our help articles")),
+        h("p", { class: "sw-sub" }, "AI answers, with a person when you need one")),
       h("button", { class: "icon-btn sw-close", type: "button", "aria-label": "Close support chat", onclick: () => close() },
         icon("close"))),
     log,
     form,
-    h("p", { class: "sw-foot" }, "Answers come only from our help articles. It can take up to a minute."));
+    h("p", { class: "sw-foot" }, "Questions about us are answered only from our help articles. "
+      + "It can take up to a minute."));
   panel.hidden = true;
 
   document.body.classList.add("has-support-widget");
@@ -92,14 +95,14 @@ function createSupportWidget() {
     append(h("div", { class: "sw-msg sw-user" }, h("p", {}, question)));
     const typing = append(botMessage(
       h("span", { class: "sw-dots", "aria-hidden": "true" }, h("span", {}), h("span", {}), h("span", {})),
-      h("span", { class: "sw-typing-text" }, "Searching our help articles…")));
+      h("span", { class: "sw-typing-text" }, "Reading your message…")));
     typing.classList.add("sw-typing");
     typing.setAttribute("aria-busy", "true");
     setLoading(send, true);
     input.disabled = true;
     try {
       const reply = await api("/ai/ask", { method: "POST", json: { question } });
-      typing.replaceWith(reply.status === "ANSWERED" ? answerMessage(reply) : notFoundMessage(reply, question));
+      typing.replaceWith(replyMessage(reply, question));
     } catch (error) {
       typing.replaceWith(botMessage(h("p", { class: "sw-error" }, icon("alert"), error.message)));
     } finally {
@@ -111,9 +114,22 @@ function createSupportWidget() {
     }
   });
 
+  /* One message per kind of reply. An intent we don't know is shown as a company answer, which is
+     the careful one: it only repeats our own articles, and says so. */
+  function replyMessage(reply, question) {
+    if (reply.intent === "GENERAL" && reply.status === "ANSWERED") return generalMessage(reply);
+    if (reply.intent === "COMPLAINT") {
+      return requestMessage(reply, question, "ticket", "Support request", "Raise a Complaint");
+    }
+    if (reply.intent === "HUMAN_HANDOFF") {
+      return requestMessage(reply, question, "headset", "Our support team", "Talk to Human Support");
+    }
+    return reply.status === "ANSWERED" ? answerMessage(reply) : notFoundMessage(reply, question);
+  }
+
   function answerMessage(reply) {
     return botMessage(
-      h("span", { class: "badge badge-plain ai-label" }, icon("info"), "AI-generated answer based on company knowledge"),
+      h("span", { class: "badge badge-plain ai-label" }, icon("info"), "AI Support · answered from our help articles"),
       h("p", { class: "sw-answer" }, reply.answer),
       h("p", { class: "sw-sources-title" }, "Sources"),
       h("ul", { class: "source-list" }, reply.sources.map((source) =>
@@ -127,22 +143,42 @@ function createSupportWidget() {
         "This answer was written by AI from the sources above. If something looks wrong, contact our support team."));
   }
 
-  /* Nothing is created here: the customer decides whether to hand the question to a person. */
-  function notFoundMessage(reply, question) {
-    const talk = reply.handoff_token
-      ? h("button", { class: "btn btn-sm sw-talk", type: "button" }, icon("headset"), "Talk to Human Support")
-      : null;
-    if (talk) {
-      talk.addEventListener("click", () => {
-        close({ returnFocus: false }); // the complaint form takes over
-        openComplaintSheet({ question, handoffToken: reply.handoff_token });
-      });
-    }
+  /* A general answer, with no company article behind it. It must not look like one: no sources,
+     and a plain note that it is general information. */
+  function generalMessage(reply) {
     return botMessage(
-      h("p", { class: "sw-notfound-title" }, icon("search"), "Our help articles don't cover this"),
+      h("span", { class: "badge badge-plain sw-general-label" }, icon("message"), "AI Assistant · general question"),
+      h("p", { class: "sw-answer" }, reply.answer),
+      h("p", { class: "meta" }, "General information, not from our help articles. "
+        + "Ask about us and I'll answer from them instead."));
+  }
+
+  /* A complaint, or a request for a person. Nothing is created here: the customer chooses. */
+  function requestMessage(reply, question, glyph, title, label) {
+    return botMessage(
+      h("p", { class: "sw-msg-title" }, icon(glyph), title),
+      h("p", {}, reply.answer),
+      handoffButton(reply, question, label));
+  }
+
+  function notFoundMessage(reply, question) {
+    const talk = handoffButton(reply, question, "Talk to Human Support");
+    return botMessage(
+      h("p", { class: "sw-msg-title" }, icon("search"), "Our help articles don't cover this"),
       h("p", {}, talk ? `${reply.answer} Our support team can help you with it.`
         : `${reply.answer} Try rephrasing your question.`),
       talk);
+  }
+
+  /* Hands the message to the existing complaint form; the ticket is created only from there. */
+  function handoffButton(reply, question, label) {
+    if (!reply.handoff_token) return null;
+    const talk = h("button", { class: "btn btn-sm sw-talk", type: "button" }, icon("headset"), label);
+    talk.addEventListener("click", () => {
+      close({ returnFocus: false }); // the complaint form takes over
+      openComplaintSheet({ question, handoffToken: reply.handoff_token });
+    });
+    return talk;
   }
 
   function botMessage(...children) {
