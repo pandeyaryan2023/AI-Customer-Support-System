@@ -35,6 +35,19 @@ def register_customer(db: Session, data: UserCreate, business_id: int) -> User:
     return user
 
 
+MIN_PASSWORD_LENGTH = 8  # the same rule UserCreate applies at sign-up
+
+
+def set_password(user: User, new_password: str) -> None:
+    """Replace a user's password with a new one. The caller commits.
+
+    Only the bcrypt hash is stored; the plain password is never kept. Nothing is emailed.
+    """
+    if len(new_password) < MIN_PASSWORD_LENGTH:
+        raise ValueError(f"Password must be at least {MIN_PASSWORD_LENGTH} characters")
+    user.hashed_password = hash_password(new_password)
+
+
 def authenticate(db: Session, email: str, password: str) -> User:
     user = get_user_by_email(db, email)
     # Same message for "unknown email" and "wrong password" so attackers can't tell which.
